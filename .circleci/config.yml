@@ -1,0 +1,36 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/closure-webpack-plugin
+    docker:
+      - image: webpackcontrib/circleci-java8-node8:latest
+    branches:
+      only:
+        - master
+        - next
+        - /.*\/feature.*/
+    steps:
+      - checkout
+      - setup_remote_docker
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: Install Dependencies
+          command: npm install
+      - save_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+          paths:
+            - ./node_modules
+      # TODO: d3viant0ne - Implement
+      # - run:
+      #     name: Unit Tests
+      #     command: npm run test:coverage
+      # - run:
+      #     name: Code Linting
+      #     command: npm run lint
+      # - run:
+      #     name: Security Scan
+      #     command: npm run security
+      # - run:
+      #     name: Report Code Coverage
+      #     command: bash <(curl -s https://codecov.io/bash)

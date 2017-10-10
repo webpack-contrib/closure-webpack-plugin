@@ -1,0 +1,24 @@
+{
+  "name": "closure-webpack-plugin",
+  "version": "0.0.1",
+  "description": "Webpack Google Closure Compiler plugin",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webpack-contrib/closure-webpack-plugin.git"
+  },
+  "keywords": [
+    "webpack",
+    "closure",
+    "optimize"
+  ],
+  "author": "Chad Killingsworth (@ChadKillingsworth)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/webpack-contrib/closure-webpack-plugin/issues"
+  },
+  "homepage": "https://github.com/webpack-contrib/closure-webpack-plugin#readme"
+}

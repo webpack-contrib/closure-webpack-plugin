@@ -71,5 +71,9 @@
       "eslint --fix",
       "git add"
     ]
+  },
+  "dependencies": {
+    "google-closure-compiler": "^20171011.0.0-webpack-beta.0",
+    "webpack-sources": "^1.0.1"
   }
 }

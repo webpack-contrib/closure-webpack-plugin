@@ -4,9 +4,9 @@
   "description": "Webpack Google Closure Compiler plugin",
   "author": "Chad Killingsworth (@ChadKillingsworth)",
   "license": "MIT",
-  "main": "dist/cjs.js",
+  "main": "src/index.js",
   "files": [
-    "dist"
+    "src"
   ],
   "scripts": {
     "test": "jest",

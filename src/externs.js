@@ -1,8 +1,8 @@
-/* eslint no-unused-vars: "off" */
+/* eslint no-unused-vars: "off", no-var: "off", no-underscore-dangle: "off" */
 /**
  * @fileoverview externs for closure-compiler webpack
  * @externs
  */
 
-/** @param {!Array<number>} chunkIds */
-function webpackJsonp(chunkIds) {}
+/** @const */
+var __wpcc = {};

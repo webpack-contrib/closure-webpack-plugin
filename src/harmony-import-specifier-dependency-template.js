@@ -1,4 +1,3 @@
-
 const HarmonyImportSpecifierDependency = require('webpack/lib/dependencies/HarmonyImportSpecifierDependency');
 
 const BASIC_PROPERTY_TEST = /^[a-zA-Z$_][a-zA-Z$_0-9]*$/;
@@ -23,4 +22,4 @@ class ClosureCompilerHarmonyImportSpecifierDependencyTemplate extends HarmonyImp
   }
 }
 
-export default ClosureCompilerHarmonyImportSpecifierDependencyTemplate;
+module.exports = ClosureCompilerHarmonyImportSpecifierDependencyTemplate;

@@ -381,4 +381,4 @@ ClosureCompilerPlugin.DEFAULT_OPTIONS = {
   jscomp_off: 'newCheckTypesExtraChecks',
 };
 
-export default ClosureCompilerPlugin;
+module.exports = ClosureCompilerPlugin;

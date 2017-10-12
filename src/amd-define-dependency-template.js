@@ -16,4 +16,4 @@ class AMDDefineDependencyTemplate extends AMDDefineDependency.Template {
   }
 }
 
-export default AMDDefineDependencyTemplate;
+module.exports = AMDDefineDependencyTemplate;

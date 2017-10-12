@@ -1,5 +1,3 @@
-
-
 function getOptionalComment(pathinfo, shortenedRequest) {
   if (!pathinfo) {
     return '';
@@ -32,4 +30,4 @@ class HarmonyImportDependencyTemplate {
   }
 }
 
-export default HarmonyImportDependencyTemplate;
+module.exports = HarmonyImportDependencyTemplate;

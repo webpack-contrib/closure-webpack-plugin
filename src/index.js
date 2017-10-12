@@ -74,10 +74,13 @@ class ClosureCompilerPlugin {
         const allSources = [{
           path: '__webpack__base_module__',
           src: ClosureCompilerPlugin.renderRuntime(scriptSrcPath),
+        }, {
+          path: require.resolve('./externs.js'),
+          src: fs.readFileSync(require.resolve('./externs.js'), 'utf8'),
         }];
 
         const BASE_MODULE_NAME = 'required-base';
-        const moduleDefs = [`${BASE_MODULE_NAME}:1`];
+        const moduleDefs = [`${BASE_MODULE_NAME}:2`];
         let uniqueId = 1;
         const entryPoints = new Set();
         entryPoints.add(allSources[0].path);
@@ -95,15 +98,7 @@ class ClosureCompilerPlugin {
           }
         });
 
-        const externs = [require.resolve('./externs.js')];
         const defines = [];
-        if (this.options.externs) {
-          if (typeof this.options.externs === 'string') {
-            externs.push(this.options.externs);
-          } else {
-            externs.push(...this.options.externs);
-          }
-        }
         if (this.options.define) {
           if (typeof this.options.define === 'string') {
             defines.push(this.options.define);
@@ -117,14 +112,11 @@ class ClosureCompilerPlugin {
 
         const moduleWrappers = moduleDefs.map((moduleDef) => {
           const defParts = moduleDef.split(':');
-          let wrapperPrologue = '';
           const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
           if (chunkIdParts) {
-            const [chunkId] = chunkIdParts;
-            wrapperPrologue = `webpackJsonp([${chunkId}]);`;
+            return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
           }
-
-          return `${defParts[0]}:(function(__wpcc){%s}).call(this, (window.__wpcc = window.__wpcc || {}));${wrapperPrologue}`;
+          return `${defParts[0]}:(function(__wpcc){%s}).call(this, {});`;
         });
 
         const compilationOptions = Object.assign(
@@ -135,7 +127,6 @@ class ClosureCompilerPlugin {
             entry_point: filteredEntryPoints,
             module: moduleDefs,
             define: defines,
-            externs,
             module_wrapper: moduleWrappers,
           });
 

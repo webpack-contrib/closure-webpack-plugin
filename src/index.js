@@ -86,11 +86,15 @@ class ClosureCompilerPlugin {
         entryPoints.add(allSources[0].path);
         originalChunks.forEach((chunk) => {
           if (chunk.hasEntryModule()) {
-            chunk.entryModule.dependencies.forEach((dep) => {
-              if (dep.module && dep.module.userRequest) {
-                entryPoints.add(dep.module.userRequest);
-              }
-            });
+            if (chunk.entryModule.userRequest) {
+              entryPoints.add(chunk.entryModule.userRequest);
+            } else {
+              chunk.entryModule.dependencies.forEach((dep) => {
+                if (dep.module && dep.module.userRequest) {
+                  entryPoints.add(dep.module.userRequest);
+                }
+              });
+            }
           }
           if (chunk.parents.length === 0) {
             uniqueId += ClosureCompilerPlugin.addChunksToCompilation(
@@ -291,8 +295,8 @@ __webpack_require__.src = function(chunkId) {
 
         const warningParts = /^(\S+) - (.*)/.exec(warning);
         if (warningParts) {
-          [errorParts.type] = warningParts;
-          [errorParts.message] = warningParts;
+          errorParts.type = warningParts[1]; // eslint-disable-line prefer-destructuring
+          errorParts.message = warningParts[2]; // eslint-disable-line prefer-destructuring
         } else {
           errorParts.type = 'ERROR';
           errorParts.message = warning;

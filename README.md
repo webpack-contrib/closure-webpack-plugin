@@ -18,7 +18,7 @@ new ClosureCompilerPlugin({mode: 'STANDARD'}, {
 
 ## Options
 
- * *mode* - `STANDARD` (default) or `AGGRESSIVE_BUNDLE`. Controls how the plugin utilizes the compiler.
+ * **mode** - `STANDARD` (default) or `AGGRESSIVE_BUNDLE`. Controls how the plugin utilizes the compiler.
 In `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.
 In `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but
 is not compatible with all input modules.
@@ -27,9 +27,11 @@ is not compatible with all input modules.
 
 The plugin controls certain compiler flags. The following flags should not be used in any mode:
 
- * *module_resolution* - A custom resolution mode for webpack is utilized instead of the standard NODE or BROWSER options.
- * *output_wrapper* - The output wrapper is automatically added by either webpack or the plugin
- * *dependency_mode* - STRICT mode is always utilized
+ * **module_resolution** - A custom resolution mode for webpack is utilized instead of the standard NODE or BROWSER options.
+ * **output_wrapper** - The output wrapper is automatically added by either webpack or the plugin
+ * **dependency_mode** - STRICT mode is always utilized
+ 
+*Note: Only AGGRESSIVE_BUNDLE mode is currently implemented.*
 
 ## Aggressive Bundle Mode
 

@@ -1,7 +1,6 @@
 const fs = require('fs');
 const { compiler: ClosureCompiler } = require('google-closure-compiler');
 const { SourceMapSource } = require('webpack-sources');
-const RequestShortener = require('webpack/lib/RequestShortener');
 const HarmonyImportDependencyTemplate = require('./harmony-import-dependency-template');
 const HarmonyImportSpecifierDependencyTemplate = require('./harmony-import-specifier-dependency-template');
 const HarmonyNoopTemplate = require('./harmony-noop-template');
@@ -13,7 +12,6 @@ class ClosureCompilerPlugin {
   }
 
   apply(compiler) {
-    const requestShortener = new RequestShortener(compiler.context);
     compiler.plugin('compilation', (compilation) => {
       // It's very difficult to override a specific dependency template without rewriting the entire set.
       // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
@@ -157,7 +155,23 @@ class ClosureCompilerPlugin {
 
         compilerProcess.on('close', (exitCode) => {
           if (stdErrData.length > 0) {
-            const errors = ClosureCompilerPlugin.parseClosureCompilerErrorData(stdErrData, requestShortener);
+            let errors;
+            try {
+              errors = JSON.parse(stdErrData);
+            } catch (e1) {
+              const exceptionIndex = stdErrData.indexOf(']java.lang.RuntimeException: INTERNAL COMPILER ERROR.');
+              if (exceptionIndex > 0) {
+                try {
+                  errors = JSON.parse(stdErrData.substring(0, exceptionIndex + 1));
+                } catch (e2) {
+                  errors = [{
+                    level: 'error',
+                    description: stdErrData,
+                  }];
+                }
+              }
+            }
+
             ClosureCompilerPlugin.reportErrors(compilation, errors);
           }
 
@@ -249,104 +263,19 @@ __webpack_require__.src = function(chunkId) {
     return nextUniqueId;
   }
 
-  static parseClosureCompilerErrorData(errData, requestShortener) {
-    const parsedErrors = [];
-    const errors = errData.split('\n\n');
-    for (let i = 0; i < errors.length; i++) {
-      const error = errors[i];
-
-      if (/^\d+ error\(s\),/.test(error)) {
-        break;
-      }
-
-      if (error.indexOf('java.lang.RuntimeException: INTERNAL COMPILER ERROR') >= 0) {
-        parsedErrors.push({
-          type: 'ERROR',
-          message: error,
-        });
-        continue; // eslint-disable-line no-continue
-      }
-
-      const fileLineExpr = /^([^:]+):(\d+):\s*/;
-      const errorLines = error.split('\n');
-      if (errorLines.length > 0) {
-        let nextLine = 1;
-        let fileParts = fileLineExpr.exec(errorLines[0]);
-        const errorParts = {};
-        let [warning] = errorLines;
-        if (fileParts) {
-          warning = errorLines[0].substr(fileParts[0].length);
-          errorParts.file = requestShortener.shorten(fileParts[1]);
-          errorParts.line = parseInt(fileParts[2], 10);
-
-          if (errorLines.length > nextLine + 1 && /^Originally at:\s*/.test(errorLines[nextLine])) {
-            fileParts = fileLineExpr.exec(errorLines[nextLine + 1]);
-            if (fileParts) {
-              errorParts.originalFile = requestShortener.shorten(fileParts[1]);
-              errorParts.originalLine = parseInt(fileParts[2], 10);
-              warning = errorLines[nextLine + 1].substr(fileParts[0].length);
-              nextLine += 2;
-            } else {
-              nextLine += 1;
-              warning = errorLines[nextLine + 1];
-            }
-          }
-        }
-
-        const warningParts = /^(\S+) - (.*)/.exec(warning);
-        if (warningParts) {
-          errorParts.type = warningParts[1]; // eslint-disable-line prefer-destructuring
-          errorParts.message = warningParts[2]; // eslint-disable-line prefer-destructuring
-        } else {
-          errorParts.type = 'ERROR';
-          errorParts.message = warning;
-        }
-
-        const context = [];
-        if (errorLines.length > nextLine) {
-          context.push(...errorLines.slice(nextLine));
-        }
-
-        if (errors.length > i + 1 && !fileLineExpr.test(errors[i + 1])) {
-          if (!errors[i + 1].indexOf('java.lang.RuntimeException: INTERNAL COMPILER ERROR') >= 0) {
-            context.push('', errors[i + 1]);
-            i += 1;
-          }
-        }
-
-        if (context.length > 0) {
-          errorParts.context = context.join('\n');
-        }
-
-        parsedErrors.push(errorParts);
-      } else {
-        parsedErrors.push({
-          type: 'ERROR',
-          message: error,
-        });
-      }
-    }
-
-    return parsedErrors;
-  }
-
   static reportErrors(compilation, errors) {
     errors.forEach((error) => {
       let formattedMsg;
-      if (error.file) {
-        formattedMsg = error.file;
+      if (error.source) {
+        formattedMsg = error.source;
         if (error.line === 0 || error.line) {
           formattedMsg += `:${error.line}`;
         }
-        if (error.originalFile) {
-          formattedMsg += ` (originally at ${error.originalFile}`;
-          if (error.originalLine) {
-            formattedMsg += `:${error.originalLine}`;
-          }
-          formattedMsg += ')';
+        if (error.originalLocation) {
+          formattedMsg += ` (originally at ${error.originalLocation.source}:${error.originalLocation.line})`;
         }
-
         formattedMsg += ` from closure-compiler: ${error.message}`;
+
         if (error.context) {
           formattedMsg += `\n${error.context}`;
         }
@@ -374,6 +303,7 @@ ClosureCompilerPlugin.DEFAULT_OPTIONS = {
   assume_function_wrapper: true,
   new_type_inf: true,
   jscomp_off: 'newCheckTypesExtraChecks',
+  error_format: 'JSON',
 };
 
 module.exports = ClosureCompilerPlugin;

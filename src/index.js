@@ -10,7 +10,7 @@ const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
-    this.compilerFlags = compilerFlags;
+    this.compilerFlags = compilerFlags || {};
   }
 
   apply(compiler) {

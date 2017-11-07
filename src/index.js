@@ -1,17 +1,20 @@
 const fs = require('fs');
 const { compiler: ClosureCompiler } = require('google-closure-compiler');
-const { SourceMapSource } = require('webpack-sources');
+const { ConcatSource, SourceMapSource } = require('webpack-sources');
+const RequestShortener = require('webpack/lib/RequestShortener');
 const HarmonyImportDependencyTemplate = require('./harmony-import-dependency-template');
 const HarmonyImportSpecifierDependencyTemplate = require('./harmony-import-specifier-dependency-template');
 const HarmonyNoopTemplate = require('./harmony-noop-template');
 const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
 
 class ClosureCompilerPlugin {
-  constructor(options) {
+  constructor(options, compilerFlags) {
     this.options = options || {};
+    this.compilerFlags = compilerFlags;
   }
 
   apply(compiler) {
+    const requestShortener = new RequestShortener(compiler.context);
     compiler.plugin('compilation', (compilation) => {
       // It's very difficult to override a specific dependency template without rewriting the entire set.
       // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
@@ -44,6 +47,8 @@ class ClosureCompilerPlugin {
       });
 
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) => {
+        // Disable the compiler for child compilations which are named.
+        // Probably want an option to control this.
         if (compilation.name) {
           cb();
           return;
@@ -101,11 +106,11 @@ class ClosureCompilerPlugin {
         });
 
         const defines = [];
-        if (this.options.define) {
-          if (typeof this.options.define === 'string') {
-            defines.push(this.options.define);
+        if (this.compilerFlags.define) {
+          if (typeof this.compilerFlags.define === 'string') {
+            defines.push(this.compilerFlags.define);
           } else {
-            defines.push(...this.options.define);
+            defines.push(...this.compilerFlags.define);
           }
         }
 
@@ -123,8 +128,8 @@ class ClosureCompilerPlugin {
 
         const compilationOptions = Object.assign(
           {},
-          ClosureCompilerPlugin.DEFAULT_OPTIONS,
-          this.options,
+          ClosureCompilerPlugin.DEFAULT_FLAGS,
+          this.compilerFlags,
           {
             entry_point: filteredEntryPoints,
             module: moduleDefs,
@@ -172,7 +177,8 @@ class ClosureCompilerPlugin {
               }
             }
 
-            ClosureCompilerPlugin.reportErrors(compilation, errors);
+            ClosureCompilerPlugin.reportErrors(compilation, errors, requestShortener);
+            // TODO(ChadKillingsworth) Figure out how to report the stats
           }
 
           if (exitCode > 0) {
@@ -200,11 +206,11 @@ class ClosureCompilerPlugin {
             const [assetName] = chunk.files;
             const sourceMap = JSON.parse(outputFile.source_map);
             sourceMap.file = assetName;
-            let source = outputFile.src;
+            const source = outputFile.src;
+            let newSource = new SourceMapSource(source, assetName, sourceMap, null, null);
             if (chunk.hasRuntime()) {
-              source = baseSrc + source;
+              newSource = new ConcatSource(baseSrc, newSource);
             }
-            const newSource = new SourceMapSource(source, assetName, sourceMap, null, null);
             compilation.assets[assetName] = newSource; // eslint-disable-line no-param-reassign
           });
 
@@ -241,13 +247,19 @@ __webpack_require__.src = function(chunkId) {
             path = `__unknown_${nextUniqueId++}__`; // eslint-disable-line no-param-reassign, no-plusplus
           }
           let src = '';
+          let sourceMap = null;
           try {
-            src = webpackModule.source().source();
+            const souceAndMap = webpackModule.source().sourceAndMap();
+            src = souceAndMap.source;
+            if (souceAndMap.map) {
+              sourceMap = JSON.stringify(souceAndMap.map);
+            }
           } catch (e) { } // eslint-disable-line no-empty
 
           return {
             path: path.replace(/[^-a-z0-9_$/\\.]+/ig, '$'),
             src,
+            sourceMap,
             webpackId: webpackModule.id,
           };
         })
@@ -263,36 +275,40 @@ __webpack_require__.src = function(chunkId) {
     return nextUniqueId;
   }
 
-  static reportErrors(compilation, errors) {
+  static reportErrors(compilation, errors, requestShortener) {
     errors.forEach((error) => {
       let formattedMsg;
       if (error.source) {
-        formattedMsg = error.source;
+        formattedMsg = requestShortener.shorten(error.source);
         if (error.line === 0 || error.line) {
           formattedMsg += `:${error.line}`;
         }
         if (error.originalLocation) {
-          formattedMsg += ` (originally at ${error.originalLocation.source}:${error.originalLocation.line})`;
+          const originalSource = error.originalLocation.source === error.source ? 'line ' : `${requestShortener.shorten(error.originalLocation.source)}:`;
+
+          if (error.originalLocation.source !== error.source || error.originalLocation.line !== error.line) {
+            formattedMsg += ` (originally at ${originalSource}${error.originalLocation.line})`;
+          }
         }
-        formattedMsg += ` from closure-compiler: ${error.message}`;
+        formattedMsg += ` from closure-compiler: ${error.description}`;
 
         if (error.context) {
           formattedMsg += `\n${error.context}`;
         }
       } else {
-        formattedMsg = `closure-compiler: ${error.message.trim()}`;
+        formattedMsg = `closure-compiler: ${error.description.trim()}`;
       }
-      if (error.type === 'WARNING') {
-        compilation.warnings.push(new Error(formattedMsg));
-      } else {
+      if (error.level === 'error') {
         compilation.errors.push(new Error(formattedMsg));
+      } else if (error.level !== 'info') {
+        compilation.warnings.push(new Error(formattedMsg));
       }
     });
   }
 }
 
 /** @const */
-ClosureCompilerPlugin.DEFAULT_OPTIONS = {
+ClosureCompilerPlugin.DEFAULT_FLAGS = {
   language_in: 'ECMASCRIPT_NEXT',
   language_out: 'ECMASCRIPT5_STRICT',
   json_streams: 'BOTH',

@@ -135,9 +135,9 @@ class ClosureCompilerPlugin {
             if (chunkIdParts) {
               return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
             }
-            return `${defParts[0]}:(function(__wpcc){%s}).call(this, {});`;
+            return `${defParts[0]}:var __wpcc;if(typeof __wpcc === 'undefined')__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);`;
           } else if (chunkIdParts) {
-            return `${defParts[0]}:(function(__wpcc){%s}).call(this, (window.__wpcc = window.__wpcc || {}));`;
+            return `${defParts[0]}:var __wpcc;if(typeof __wpcc === 'undefined')__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);`;
           }
 
           return null;

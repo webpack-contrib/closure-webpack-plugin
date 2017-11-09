@@ -85,6 +85,7 @@ class ClosureCompilerPlugin {
         const BASE_MODULE_NAME = 'required-base';
         const moduleDefs = [`${BASE_MODULE_NAME}:2`];
         let uniqueId = 1;
+        let runtimeNeeded = false;
         const entryPoints = new Set();
         entryPoints.add(allSources[0].path);
         originalChunks.forEach((chunk) => {
@@ -103,7 +104,17 @@ class ClosureCompilerPlugin {
             uniqueId += ClosureCompilerPlugin.addChunksToCompilation(
               compilation, chunk, allSources, BASE_MODULE_NAME, moduleDefs, uniqueId);
           }
+
+          // The runtime must be injected if at least one module
+          // is late loaded (doesn't include the runtime)
+          if (!chunk.hasRuntime()) {
+            runtimeNeeded = true;
+          }
         });
+
+        if (!runtimeNeeded) {
+          allSources[0].src = '';
+        }
 
         const defines = [];
         if (this.compilerFlags.define) {
@@ -120,11 +131,17 @@ class ClosureCompilerPlugin {
         const moduleWrappers = moduleDefs.map((moduleDef) => {
           const defParts = moduleDef.split(':');
           const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
-          if (chunkIdParts) {
-            return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
+          if (runtimeNeeded) {
+            if (chunkIdParts) {
+              return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
+            }
+            return `${defParts[0]}:var __wpcc;if(typeof __wpcc === 'undefined')__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);`;
+          } else if (chunkIdParts) {
+            return `${defParts[0]}:var __wpcc;if(typeof __wpcc === 'undefined')__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);`;
           }
-          return `${defParts[0]}:(function(__wpcc){%s}).call(this, {});`;
-        });
+
+          return null;
+        }).filter(wrapper => wrapper !== null);
 
         const compilationOptions = Object.assign(
           {},
@@ -168,6 +185,10 @@ class ClosureCompilerPlugin {
               if (exceptionIndex > 0) {
                 try {
                   errors = JSON.parse(stdErrData.substring(0, exceptionIndex + 1));
+                  errors.push({
+                    level: 'error',
+                    description: stdErrData.substr(exceptionIndex + 1),
+                  });
                 } catch (e2) {
                   errors = [{
                     level: 'error',

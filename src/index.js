@@ -199,7 +199,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         module_wrapper: moduleWrappers,
       });
 
-    const compilerProcess = this.runCompiler(compilationOptions, (exitCode, stdOutData, stdErrData) => {
+    const compilerProcess = ClosureCompilerPlugin.runCompiler(compilationOptions, (exitCode, stdOutData, stdErrData) => {
       if (stdErrData instanceof Error) {
         this.reportErrors({
           level: 'error',
@@ -285,7 +285,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    * @return {!ChildProcess}
    */
   static runCompiler(flags, doneCallback) {
-    const compilerRunner = new ClosureCompiler(flags, doneCallback);
+    const compilerRunner = new ClosureCompiler(flags);
     compilerRunner.spawnOptions = { stdio: 'pipe' };
     const compilerProcess = compilerRunner.run();
 

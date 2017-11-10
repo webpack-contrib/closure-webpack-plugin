@@ -56,8 +56,8 @@ In Aggressive Bundle Mode, a file can only appear in a single output chunk. Use 
 
 ## Tips for Use
  * Don't use babel - closure-compiler is also a transpiler.
-   If you need features not yet supported by closure-compiler, have babel
-   only target those features.
+   If you need [features not yet supported](https://github.com/google/closure-compiler/wiki/ECMAScript6) by closure-compiler, have babel
+   only target those features. 
    
    
 <h2 align="center">Maintainers</h2>

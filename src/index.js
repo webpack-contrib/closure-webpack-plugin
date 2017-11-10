@@ -181,7 +181,7 @@ class ClosureCompilerPlugin {
             try {
               errors = JSON.parse(stdErrData);
             } catch (e1) {
-              const exceptionIndex = stdErrData.indexOf(']java.lang.RuntimeException: INTERNAL COMPILER ERROR.');
+              const exceptionIndex = stdErrData.indexOf(']java.lang.');
               if (exceptionIndex > 0) {
                 try {
                   errors = JSON.parse(stdErrData.substring(0, exceptionIndex + 1));
@@ -189,12 +189,15 @@ class ClosureCompilerPlugin {
                     level: 'error',
                     description: stdErrData.substr(exceptionIndex + 1),
                   });
-                } catch (e2) {
-                  errors = [{
-                    level: 'error',
-                    description: stdErrData,
-                  }];
+                } catch (e2) { // eslint-disable-line no-empty
                 }
+              }
+              if (!errors) {
+                errors = errors || [];
+                errors.push({
+                  level: 'error',
+                  description: stdErrData,
+                });
               }
             }
 

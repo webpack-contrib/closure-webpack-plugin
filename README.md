@@ -1,11 +1,17 @@
 # closure-webpack-plugin
 
+[![npm version](https://badge.fury.io/js/closure-webpack-plugin.svg)](https://badge.fury.io/js/closure-webpack-plugin)
+
 [Closure-Compiler](https://developers.google.com/closure/compiler/) is a full optimizing compiler and transpiler.
 It offers unmatched optimizations, provides type checking and can easily target transpilation to different versions of ECMASCRIPT.
+
+**Note:** This plugin is a very early beta and currently uses a custom build of closure-compiler while neccessary changes are integrated back into the main compiler repository.
 
 ## Usage example
 
 ```js
+const ClosureCompilerPlugin = require('closure-webpack-plugin');
+
 new ClosureCompilerPlugin({mode: 'STANDARD'}, {
   // compiler flags here
   //
@@ -18,9 +24,9 @@ new ClosureCompilerPlugin({mode: 'STANDARD'}, {
 
 ## Options
 
- * **mode** - `STANDARD` (default) or `AGGRESSIVE_BUNDLE`. Controls how the plugin utilizes the compiler.
-In `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.
-In `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but
+ * **mode** - `STANDARD` (default) or `AGGRESSIVE_BUNDLE`. Controls how the plugin utilizes the compiler.  
+    In `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.  
+    In `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but
 is not compatible with all input modules.
 
 *Note: Only AGGRESSIVE_BUNDLE mode is currently implemented.*
@@ -31,7 +37,7 @@ The plugin controls certain compiler flags. The following flags should not be us
 
  * **module_resolution** - A custom resolution mode for webpack is utilized instead of the standard NODE or BROWSER options.
  * **output_wrapper** - The output wrapper is automatically added by either webpack or the plugin
- * **dependency_mode** - STRICT mode is always utilized
+ * **dependency_mode** - Controlled by the plugin mode.
 
 ## Aggressive Bundle Mode
 
@@ -46,7 +52,33 @@ const bar = require('bar');
 Aggressive Bundle Mode utilizes a custom runtime in which modules within a chunk file are all included in the same scope.
 This avoides [the cost of small modules](https://nolanlawson.com/2016/08/15/the-cost-of-small-modules/).
 
+In Aggressive Bundle Mode, a file can only appear in a single output chunk. Use the [Commons Chunk Plugin](https://webpack.js.org/plugins/commons-chunk-plugin/) to split duplicated files into a single output chunk.
+
 ## Tips for Use
  * Don't use babel - closure-compiler is also a transpiler.
    If you need features not yet supported by closure-compiler, have babel
    only target those features.
+   
+   
+<h2 align="center">Maintainers</h2>
+
+<table>
+  <tbody>
+    <tr>
+      <td align="center">
+        <a href="https://github.com/ChadKillingsworth">
+          <img width="150" alt="" height="150" src="https://avatars.githubusercontent.com/u/1247639?v=3">
+          </br>
+          Chad Killingsworth
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://github.com/d3viant0ne">
+          <img width="150" alt="" height="150" src="https://avatars.githubusercontent.com/u/8420490?v=3">
+          </br>
+          Joshua Wiens
+        </a>
+      </td>
+    </tr>
+  <tbody>
+</table>

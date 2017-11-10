@@ -112,6 +112,32 @@ class ClosureCompilerPlugin {
           }
         });
 
+        const sources = new Set();
+        const duplicatedSources = new Set();
+        allSources.forEach((source) => {
+          // console.log(source.src, sources.has(source.src));
+          if (sources.has(source.path)) {
+            duplicatedSources.add(source.path);
+          }
+          sources.add(source.path);
+        });
+
+        if (duplicatedSources.size > 0) {
+          const duplicateErrors = [];
+          duplicatedSources.forEach((sourcePath) => {
+            const shortSource = requestShortener.shorten(sourcePath);
+            duplicateErrors.push({
+              level: 'error',
+              description: `${shortSource} exists in more than one bundle.
+Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
+            });
+          });
+          ClosureCompilerPlugin.reportErrors(compilation, duplicateErrors, requestShortener);
+          cb();
+          return;
+        }
+
+
         if (!runtimeNeeded) {
           allSources[0].src = '';
         }

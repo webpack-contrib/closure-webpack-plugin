@@ -62,9 +62,19 @@ class ClosureCompilerPlugin {
 
         if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
           this.aggressiveBundle(compilation, originalChunks, cb);
+        } else {
+          this.standardBundle(compilation, originalChunks, cb);
         }
       });
     });
+  }
+
+  standardBundle(compilation, originalChunks, cb) {
+    this.reportErrors(compilation, [{
+      level: 'warning',
+      description: 'STANDARD mode not yet implemented',
+    }]);
+    cb();
   }
 
   /**

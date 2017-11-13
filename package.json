@@ -33,10 +33,11 @@
     "eslint-plugin-import": "^2.7.0",
     "jest": "^21.2.1",
     "lint-staged": "^4.2.3",
-    "nsp": "^2.8.1",
+    "memory-fs": "^0.4.1",
+    "nsp": "^3.1.0",
     "pre-commit": "^1.2.2",
     "standard-version": "^4.2.0",
-    "webpack": "^3.6.0"
+    "webpack": "^3.8.1"
   },
   "engines": {
     "node": ">=6.9.0 || >=8.9.0"

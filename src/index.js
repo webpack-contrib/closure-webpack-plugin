@@ -7,6 +7,11 @@ const HarmonyImportSpecifierDependencyTemplate = require('./harmony-import-speci
 const HarmonyNoopTemplate = require('./harmony-noop-template');
 const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
 
+const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/ig;
+function toSafePath(originalPath) {
+  return originalPath.replace(UNSAFE_PATH_CHARS, '$');
+}
+
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
@@ -70,11 +75,57 @@ class ClosureCompilerPlugin {
   }
 
   standardBundle(compilation, originalChunks, cb) {
-    this.reportErrors(compilation, [{
-      level: 'warning',
-      description: 'STANDARD mode not yet implemented',
-    }]);
-    cb();
+    let uniqueId = 1;
+    let compilationChain = Promise.resolve();
+    originalChunks.forEach((chunk) => {
+      if (chunk.parents.length !== 0) {
+        return;
+      }
+      const moduleDefs = [];
+      const sources = [];
+      uniqueId += this.addChunksToCompilation(
+        compilation, chunk, sources, null, moduleDefs, uniqueId);
+
+      const compilationOptions = Object.assign(
+        {},
+        ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD,
+        this.compilerFlags,
+        {
+          module: moduleDefs,
+        });
+
+      if (!compilationOptions.externs) {
+        compilationOptions.externs = [];
+      } else if (typeof compilationOptions.externs === 'string') {
+        compilationOptions.externs = [compilationOptions.externs];
+      }
+      compilationOptions.externs = require.resolve('./standard-externs.js');
+
+      compilationChain = compilationChain
+        .then(() => this.runCompiler(compilation, compilationOptions, sources)
+          .then((outputFiles) => {
+            outputFiles.forEach((outputFile) => {
+              const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
+              if (!chunkIdParts) {
+                return;
+              }
+              const chunkId = parseInt(chunkIdParts[1], 10);
+              const matchingChunk = compilation.chunks.find(
+                chunk_ => chunk_.id === chunkId);
+              if (!matchingChunk) {
+                return;
+              }
+              const [assetName] = matchingChunk.files;
+              const sourceMap = JSON.parse(outputFile.source_map);
+              sourceMap.file = assetName;
+              const source = outputFile.src;
+              compilation.assets[assetName] = // eslint-disable-line no-param-reassign
+                new SourceMapSource(source, assetName, sourceMap, null, null);
+            });
+          }));
+    });
+
+    compilationChain.then(() => cb()).catch(() => cb());
   }
 
   /**
@@ -107,8 +158,8 @@ class ClosureCompilerPlugin {
       path: '__webpack__base_module__',
       src: ClosureCompilerPlugin.renderRuntime(scriptSrcPath),
     }, {
-      path: require.resolve('./externs.js'),
-      src: fs.readFileSync(require.resolve('./externs.js'), 'utf8'),
+      path: require.resolve('./aggressive-bundle-externs.js'),
+      src: fs.readFileSync(require.resolve('./aggressive-bundle-externs.js'), 'utf8'),
     }];
 
     const BASE_MODULE_NAME = 'required-base';
@@ -120,17 +171,17 @@ class ClosureCompilerPlugin {
     originalChunks.forEach((chunk) => {
       if (chunk.hasEntryModule()) {
         if (chunk.entryModule.userRequest) {
-          entryPoints.add(chunk.entryModule.userRequest);
+          entryPoints.add(toSafePath(chunk.entryModule.userRequest));
         } else {
           chunk.entryModule.dependencies.forEach((dep) => {
             if (dep.module && dep.module.userRequest) {
-              entryPoints.add(dep.module.userRequest);
+              entryPoints.add(toSafePath(dep.module.userRequest));
             }
           });
         }
       }
       if (chunk.parents.length === 0) {
-        uniqueId += ClosureCompilerPlugin.addChunksToCompilation(
+        uniqueId += this.addChunksToCompilation(
           compilation, chunk, allSources, BASE_MODULE_NAME, moduleDefs, uniqueId);
       }
 
@@ -144,7 +195,6 @@ class ClosureCompilerPlugin {
     const sourcePaths = new Set();
     const duplicatedSources = new Set();
     allSources.forEach((source) => {
-      // console.log(source.src, sources.has(source.src));
       if (sourcePaths.has(source.path)) {
         duplicatedSources.add(source.path);
       }
@@ -165,7 +215,6 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       cb();
       return;
     }
-
 
     if (!runtimeNeeded) {
       allSources[0].src = '';
@@ -200,7 +249,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
     const compilationOptions = Object.assign(
       {},
-      ClosureCompilerPlugin.DEFAULT_FLAGS,
+      ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE,
       this.compilerFlags,
       {
         entry_point: filteredEntryPoints,
@@ -209,32 +258,98 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         module_wrapper: moduleWrappers,
       });
 
-    const compilerProcess = ClosureCompilerPlugin.runCompiler(compilationOptions, (exitCode, stdOutData, stdErrData) => {
-      if (stdErrData instanceof Error) {
-        this.reportErrors({
-          level: 'error',
-          description: stdErrData.message,
-        });
-        cb();
-        return;
-      }
+    /**
+     * Invoke the compiler and return a promise of the results.
+     * Success returns an array of output files.
+     * Failure returns the exit code.
+     */
+    this.runCompiler(compilation, compilationOptions, allSources)
+      .then((outputFiles) => {
+        const baseFile = outputFiles.find(file => /required-base/.test(file.path));
+        let baseSrc = `${baseFile.src}\n`;
+        if (/^['"]use strict['"];\s*$/.test(baseFile.src)) {
+          baseSrc = '';
+        }
 
-      if (stdErrData.length > 0) {
-        let errors;
-        try {
-          errors = JSON.parse(stdErrData);
-        } catch (e1) {
-          const exceptionIndex = stdErrData.indexOf(']java.lang.');
-          if (exceptionIndex > 0) {
-            try {
-              errors = JSON.parse(stdErrData.substring(0, exceptionIndex + 1));
-              errors.push({
-                level: 'error',
-                description: stdErrData.substr(exceptionIndex + 1),
-              });
-            } catch (e2) { // eslint-disable-line no-empty
+        outputFiles.forEach((outputFile) => {
+          const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
+          if (!chunkIdParts) {
+            return;
+          }
+          const chunkId = parseInt(chunkIdParts[1], 10);
+          const chunk = compilation.chunks.find(chunk_ => chunk_.id === chunkId);
+          if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
+            return;
+          }
+          const [assetName] = chunk.files;
+          const sourceMap = JSON.parse(outputFile.source_map);
+          sourceMap.file = assetName;
+          const source = outputFile.src;
+          let newSource = new SourceMapSource(source, assetName, sourceMap, null, null);
+          if (chunk.hasRuntime()) {
+            newSource = new ConcatSource(baseSrc, newSource);
+          }
+          compilation.assets[assetName] = newSource; // eslint-disable-line no-param-reassign
+        });
+
+        cb();
+      })
+      .catch(() => cb());
+  }
+
+  runCompiler(compilation, flags, sources) {
+    return new Promise((resolve, reject) => {
+      const compilerRunner = new ClosureCompiler(flags);
+      compilerRunner.spawnOptions = { stdio: 'pipe' };
+      const compilerProcess = compilerRunner.run();
+
+      let stdOutData = '';
+      let stdErrData = '';
+      compilerProcess.stdout.on('data', (data) => {
+        stdOutData += data;
+      });
+
+      compilerProcess.stderr.on('data', (data) => {
+        stdErrData += data;
+      });
+
+      compilerProcess.on('error', (err) => {
+        this.reportErrors(compilation, [{
+          level: 'error',
+          description: `Closure-compiler. Could not be launched. Is java in the path?\n${
+            compilerRunner.prependFullCommand(err.message)}`,
+        }]);
+        reject();
+      });
+
+      compilerProcess.on('close', (exitCode) => {
+        if (stdErrData instanceof Error) {
+          this.reportErrors({
+            level: 'error',
+            description: stdErrData.message,
+          });
+          reject();
+          return;
+        }
+
+        if (stdErrData.length > 0) {
+          let errors;
+          try {
+            errors = JSON.parse(stdErrData);
+          } catch (e1) {
+            const exceptionIndex = stdErrData.indexOf(']java.lang.');
+            if (exceptionIndex > 0) {
+              try {
+                errors = JSON.parse(stdErrData.substring(0, exceptionIndex + 1));
+                errors.push({
+                  level: 'error',
+                  description: stdErrData.substr(exceptionIndex + 1),
+                });
+              } catch (e2) { // eslint-disable-line no-empty
+              }
             }
           }
+
           if (!errors) {
             errors = errors || [];
             errors.push({
@@ -242,84 +357,99 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
               description: stdErrData,
             });
           }
+
+          this.reportErrors(compilation, errors);
+          // TODO(ChadKillingsworth) Figure out how to report the stats
         }
 
-        this.reportErrors(compilation, errors);
-        // TODO(ChadKillingsworth) Figure out how to report the stats
-      }
-
-      if (exitCode > 0) {
-        cb();
-        return;
-      }
-
-      const outputFiles = JSON.parse(stdOutData);
-
-      const baseFile = outputFiles.find(file => /required-base/.test(file.path));
-      let baseSrc = `${baseFile.src}\n`;
-      if (/^['"]use strict['"];\s*$/.test(baseFile.src)) {
-        baseSrc = '';
-      }
-      outputFiles.forEach((outputFile) => {
-        const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
-        if (!chunkIdParts) {
+        if (exitCode > 0) {
+          reject();
           return;
         }
-        const chunkId = parseInt(chunkIdParts[1], 10);
-        const chunk = compilation.chunks.find(chunk_ => chunk_.id === chunkId);
-        if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
-          return;
-        }
-        const [assetName] = chunk.files;
-        const sourceMap = JSON.parse(outputFile.source_map);
-        sourceMap.file = assetName;
-        const source = outputFile.src;
-        let newSource = new SourceMapSource(source, assetName, sourceMap, null, null);
-        if (chunk.hasRuntime()) {
-          newSource = new ConcatSource(baseSrc, newSource);
-        }
-        compilation.assets[assetName] = newSource; // eslint-disable-line no-param-reassign
+
+        const outputFiles = JSON.parse(stdOutData);
+        resolve(outputFiles);
       });
 
-      cb();
-    });
-
-    process.nextTick(() => {
-      compilerProcess.stdin.end(JSON.stringify(allSources));
+      process.nextTick(() => {
+        compilerProcess.stdin.end(JSON.stringify(sources));
+      });
     });
   }
 
-  /**
-   * @param {Object<string, *>} compilation options for closure compiler
-   * @param {function(number, string, (string|Error))} doneCallback
-   * @return {!ChildProcess}
-   */
-  static runCompiler(flags, doneCallback) {
-    const compilerRunner = new ClosureCompiler(flags);
-    compilerRunner.spawnOptions = { stdio: 'pipe' };
-    const compilerProcess = compilerRunner.run();
+  addChunksToCompilation(compilation, chunk, sources, baseModule, moduleDefs, nextUniqueId) {
+    let chunkSources;
+    if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
+      chunkSources = ClosureCompilerPlugin.getChunkSources(chunk, () => {
+        const newId = nextUniqueId;
+        nextUniqueId += 1; // eslint-disable-line no-param-reassign
+        return newId;
+      });
+    } else {
+      const chunkName = `chunk-${chunk.id}`;
+      let src = '';
+      let sourceMap = null;
+      try {
+        const souceAndMap = compilation.assets[chunk.files[0]].sourceAndMap();
+        src = souceAndMap.source;
+        if (souceAndMap.map) {
+          sourceMap = JSON.stringify(souceAndMap.map);
+        }
+      } catch (e) { } // eslint-disable-line no-empty
+      chunkSources = [{
+        path: chunkName,
+        src,
+        sourceMap,
+      }];
+    }
 
-    let stdOutData = '';
-    let stdErrData = '';
-    compilerProcess.stdout.on('data', (data) => {
-      stdOutData += data;
+    sources.push(...chunkSources);
+    const chunkName = `chunk-${chunk.id}`;
+    let moduleDef = `${chunkName}:${chunkSources.length}`;
+    if (baseModule) {
+      moduleDef += `:${baseModule}`;
+    }
+    moduleDefs.push(moduleDef);
+    chunk.chunks.forEach((nestedChunk) => {
+      nextUniqueId += this.addChunksToCompilation( // eslint-disable-line no-param-reassign
+        compilation, nestedChunk, sources, chunkName, moduleDefs, nextUniqueId);
     });
-
-    compilerProcess.stderr.on('data', (data) => {
-      stdErrData += data;
-    });
-
-    compilerProcess.on('error', (err) => {
-      doneCallback(1, null, new Error(`Closure-compiler. Could not be launched. Is java in the path?\n${
-        compilerRunner.prependFullCommand(err.message)}`));
-    });
-
-    compilerProcess.on('close', (exitCode) => {
-      doneCallback(exitCode, stdOutData, stdErrData);
-    });
-
-    return compilerProcess;
+    return nextUniqueId;
   }
+
+  static getChunkSources(chunk, getUniqueId) {
+    if (chunk.isEmpty()) {
+      return [{
+        path: `__empty_${getUniqueId()}__`,
+        src: '',
+      }];
+    }
+    return chunk.getModules()
+      .map((webpackModule) => {
+        let path = webpackModule.userRequest;
+        if (!path) {
+          path = `__unknown_${getUniqueId()}__`;
+        }
+        let src = '';
+        let sourceMap = null;
+        try {
+          const souceAndMap = webpackModule.source().sourceAndMap();
+          src = souceAndMap.source;
+          if (souceAndMap.map) {
+            sourceMap = JSON.stringify(souceAndMap.map);
+          }
+        } catch (e) { } // eslint-disable-line no-empty
+
+        return {
+          path: toSafePath(path),
+          src,
+          sourceMap,
+          webpackId: webpackModule.id,
+        };
+      })
+      .filter(moduleJson => !(moduleJson.path === '__unknown__' && moduleJson.src === '/* (ignored) */'));
+  }
+
 
   /**
    * Given the source path of the output destination, return the custom
@@ -334,49 +464,6 @@ __webpack_require__.src = function(chunkId) {
   return __webpack_require__.p + ${scriptSrcPath};
 }
 `;
-  }
-
-  static addChunksToCompilation(compilation, chunk, sources, baseModule, moduleDefs, nextUniqueId) {
-    let chunkSources;
-    if (chunk.isEmpty()) {
-      chunkSources = [{
-        path: `__empty_${nextUniqueId++}__`, // eslint-disable-line no-param-reassign, no-plusplus
-        src: '',
-      }];
-    } else {
-      chunkSources = chunk.getModules()
-        .map((webpackModule) => {
-          let path = webpackModule.userRequest;
-          if (!path) {
-            path = `__unknown_${nextUniqueId++}__`; // eslint-disable-line no-param-reassign, no-plusplus
-          }
-          let src = '';
-          let sourceMap = null;
-          try {
-            const souceAndMap = webpackModule.source().sourceAndMap();
-            src = souceAndMap.source;
-            if (souceAndMap.map) {
-              sourceMap = JSON.stringify(souceAndMap.map);
-            }
-          } catch (e) { } // eslint-disable-line no-empty
-
-          return {
-            path: path.replace(/[^-a-z0-9_$/\\.]+/ig, '$'),
-            src,
-            sourceMap,
-            webpackId: webpackModule.id,
-          };
-        })
-        .filter(moduleJson => !(moduleJson.path === '__unknown__' && moduleJson.src === '/* (ignored) */'));
-    }
-    sources.push(...chunkSources);
-    const chunkName = `chunk-${chunk.id}`;
-    moduleDefs.push(`${chunkName}:${chunkSources.length}:${baseModule}`);
-    chunk.chunks.forEach((nestedChunk) => {
-      nextUniqueId += ClosureCompilerPlugin.addChunksToCompilation( // eslint-disable-line no-param-reassign
-        compilation, nestedChunk, sources, chunkName, moduleDefs, nextUniqueId);
-    });
-    return nextUniqueId;
   }
 
   /**
@@ -416,7 +503,7 @@ __webpack_require__.src = function(chunkId) {
 }
 
 /** @const */
-ClosureCompilerPlugin.DEFAULT_FLAGS = {
+ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE = {
   language_in: 'ECMASCRIPT_NEXT',
   language_out: 'ECMASCRIPT5_STRICT',
   json_streams: 'BOTH',
@@ -425,6 +512,16 @@ ClosureCompilerPlugin.DEFAULT_FLAGS = {
   process_common_js_modules: true,
   dependency_mode: 'STRICT',
   assume_function_wrapper: true,
+  new_type_inf: true,
+  jscomp_off: 'newCheckTypesExtraChecks',
+  error_format: 'JSON',
+};
+
+/** @const */
+ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD = {
+  language_in: 'ECMASCRIPT_NEXT',
+  language_out: 'ECMASCRIPT5_STRICT',
+  json_streams: 'BOTH',
   new_type_inf: true,
   jscomp_off: 'newCheckTypesExtraChecks',
   error_format: 'JSON',

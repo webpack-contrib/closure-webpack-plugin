@@ -16,7 +16,7 @@ class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
     if (!(this.options.mode === 'STANDARD' || this.options.module === 'AGGRESSIVE_BUNDLE')) {
-      this.options.mode = 'AGGRESSIVE_BUNDLE';
+      this.options.mode = 'STANDARD';
     }
     this.compilerFlags = compilerFlags || {};
   }

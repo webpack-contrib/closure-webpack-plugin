@@ -1,6 +1,6 @@
 {
   "name": "closure-webpack-plugin",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Webpack Google Closure Compiler plugin",
   "author": "Chad Killingsworth (@ChadKillingsworth)",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "travis:coverage": "npm run test:coverage -- --runInBand"
   },
   "dependencies": {
-    "google-closure-compiler": "^20171109.0.0-webpack-beta",
+    "google-closure-compiler": "^20171116.0.0-webpack-beta",
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {

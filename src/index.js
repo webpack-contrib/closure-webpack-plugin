@@ -15,7 +15,9 @@ function toSafePath(originalPath) {
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
-    if (!(this.options.mode === 'STANDARD' || this.options.module === 'AGGRESSIVE_BUNDLE')) {
+    if (!('mode' in this.options)) {
+      this.options.mode = 'STANDARD';
+    } else if (this.options.mode !== 'STANDARD' && this.options.mode !== 'AGGRESSIVE_BUNDLE') {
       this.options.mode = 'STANDARD';
     }
     this.compilerFlags = compilerFlags || {};

@@ -99,7 +99,7 @@ jobs:
           command: npm run security
       - run:
           name: Validate Commit Messages
-          command: ./node_modules/.bin/commitlint --from=$(git merge-base master "${CIRCLE_BRANCH}")
+          command: npm run lint:commits
   publish:
     working_directory: ~/closure-webpack-plugin
     docker:
@@ -114,7 +114,7 @@ jobs:
           command: npm rebuild
       - run:
           name: Validate Commit Messages
-          command: ./node_modules/.bin/commitlint --from=$(git merge-base master (git describe --tags --abbrev=0))
+          command: npm run release:validate
       - run:
           name: Publish to NPM
           command: printf "Pretend running conventional-github-releaser"

@@ -99,7 +99,7 @@ jobs:
           command: npm run security
       - run:
           name: Validate Commit Messages
-          command: ./node_modules/.bin/commitlint --from=$(git merge-base master ${CIRCLE_BRANCH})
+          command: ./node_modules/.bin/commitlint --from=$(git merge-base master "${CIRCLE_BRANCH}")
   publish:
     working_directory: ~/closure-webpack-plugin
     docker:

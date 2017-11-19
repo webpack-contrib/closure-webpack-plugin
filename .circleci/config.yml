@@ -75,6 +75,9 @@ jobs:
       - run:
           name: Run NSP Security Check.
           command: npm run security
+      - run:
+          name: Validate Commit Messages
+          command: npm run commitlint -- --from=$(git merge-base master ${CIRCLE_BRANCH})
 
 version: 2.0
 workflows:

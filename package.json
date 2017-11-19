@@ -11,9 +11,12 @@
   "scripts": {
     "test": "jest",
     "appveyor:test": "npm run test",
+    "commitlint": "commitlint",
     "lint": "eslint --cache src test",
     "lint-staged": "lint-staged",
     "release": "standard-version",
+    "release:ci": "conventional-github-releaser -p angular",
+    "release:validate": "commitlint",
     "security": "nsp check",
     "test:watch": "jest --watch",
     "test:coverage": "jest --collectCoverageFrom='src/**/*.js' --coverage",
@@ -26,6 +29,9 @@
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^5.0.0",
+    "@commitlint/config-angular": "^5.0.0",
+    "conventional-github-releaser": "^2.0.0",
     "cross-env": "^5.0.5",
     "del-cli": "^1.1.0",
     "eslint": "^4.8.0",

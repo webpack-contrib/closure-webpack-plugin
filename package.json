@@ -11,9 +11,14 @@
   "scripts": {
     "test": "jest",
     "appveyor:test": "npm run test",
+    "commitlint": "commitlint",
+    "commitmsg": "commitlint -e $GIT_PARAMS",
     "lint": "eslint --cache src test",
+    "lint:commits": "commitlint --from=$(git merge-base master '${CIRCLE_BRANCH}')",
     "lint-staged": "lint-staged",
     "release": "standard-version",
+    "release:ci": "conventional-github-releaser -p angular",
+    "release:validate": "commitlint --from=$(git merge-base master (git describe --tags --abbrev=0))",
     "security": "nsp check",
     "test:watch": "jest --watch",
     "test:coverage": "jest --collectCoverageFrom='src/**/*.js' --coverage",
@@ -26,23 +31,28 @@
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^5.0.0",
+    "@commitlint/config-angular": "^5.0.0",
+    "conventional-github-releaser": "^2.0.0",
     "cross-env": "^5.0.5",
     "del-cli": "^1.1.0",
     "eslint": "^4.8.0",
     "eslint-config-webpack": "^1.2.5",
     "eslint-plugin-import": "^2.7.0",
+    "husky": "^0.14.3",
     "jest": "^21.2.1",
     "lint-staged": "^4.2.3",
-    "nsp": "^2.8.1",
+    "memory-fs": "^0.4.1",
+    "nsp": "^3.1.0",
     "pre-commit": "^1.2.2",
     "standard-version": "^4.2.0",
-    "webpack": "^3.6.0"
+    "webpack": "^3.8.1"
   },
   "engines": {
-    "node": ">= 4.8 < 5.0.0 || >= 5.10"
+    "node": ">=6.9.0 || >=8.9.0"
   },
   "peerDependencies": {
-    "webpack": "^2.0.0 || ^3.0.0"
+    "webpack": "^3.0.0 || ^4.0.0"
   },
   "repository": {
     "type": "git",

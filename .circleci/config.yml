@@ -1,29 +1,37 @@
 unit_tests: &unit_tests
   steps:
     - checkout
+    - setup_remote_docker
+    - restore_cache:
+        key: dependency-cache-{{ checksum "package.json" }}
     - run:
-        name: Install modules and dependencies.
-        command: npm install
+        name: NPM Rebuild
+        command: npm rebuild
+    - run:
+        name: Run unit tests.
+        command: npm test
+canary_tests: &canary_tests
+  steps:
+    - checkout
+    - setup_remote_docker
+    - restore_cache:
+        key: dependency-cache-{{ checksum "package.json" }}
+    - run:
+        name: NPM Rebuild
+        command: npm rebuild
+    - run:
+        name: Install Webpack Canary
+        command: npm i --no-save git://github.com/webpack/webpack.git#master
     - run:
         name: Run unit tests.
         command: npm test
 
 version: 2
 jobs:
-  build:
+  dependency_cache:
     working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-node-base:latest
-    branches:
-      only:
-        - master
-        - next
-        - /.*\/refactor.*/
-        - /.*\/chore.*/
-        - /.*\/feat.*/
-        - /.*\/perf.*/
-        - /.*\/test.*/
-        - /.*\/fix.*/
     steps:
       - checkout
       - setup_remote_docker
@@ -36,14 +44,19 @@ jobs:
           key: dependency-cache-{{ checksum "package.json" }}
           paths:
             - ./node_modules
-  node8:
+
+  node8_webpack_latest:
+    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-jdk9-node8:latest
     steps:
       - checkout
+      - setup_remote_docker
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
       - run:
-          name: Install modules and dependencies.
-          command: npm install
+          name: NPM Rebuild
+          command: npm rebuild
       - run:
           name: Run unit tests.
           command: npm test
@@ -51,24 +64,33 @@ jobs:
           name: Submit coverage data to codecov.
           command: bash <(curl -s https://codecov.io/bash)
           when: always
-  node6:
+  node6_webpack_latest:
+    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-jdk9-node6:latest
     <<: *unit_tests
-  node9:
+  node9_webpack_latest:
+    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-jdk9-node9:latest
     <<: *unit_tests
-
+  node8_webpack_canary:
+    working_directory: ~/closure-webpack-plugin
+    docker:
+      - image: webpackcontrib/circleci-jdk9-node8:latest
+    <<: *canary_tests
   analysis:
+    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-node-base:latest
     steps:
       - checkout
+      - setup_remote_docker
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
       - run:
-          name: Install modules and dependencies.
-          command: |
-            npm install
+          name: NPM Rebuild
+          command: npm rebuild
       - run:
           name: Run linting.
           command: npm run lint
@@ -77,30 +99,71 @@ jobs:
           command: npm run security
       - run:
           name: Validate Commit Messages
-          command: npm run commitlint -- --from=$(git merge-base master ${CIRCLE_BRANCH})
+          command: ./node_modules/.bin/commitlint --from=$(git merge-base master ${CIRCLE_BRANCH})
+  publish:
+    working_directory: ~/closure-webpack-plugin
+    docker:
+      - image: webpackcontrib/circleci-node-base:latest
+    steps:
+      - checkout
+      - setup_remote_docker
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: NPM Rebuild
+          command: npm rebuild
+      - run:
+          name: Validate Commit Messages
+          command: ./node_modules/.bin/commitlint --from=$(git merge-base master (git describe --tags --abbrev=0))
+      - run:
+          name: Publish to NPM
+          command: printf "Pretend running conventional-github-releaser"
 
 version: 2.0
 workflows:
   version: 2
-  tests:
+  validate-publish:
     jobs:
-      - node6:
+      - dependency_cache
+      - node6_webpack_latest:
+          requires:
+            - dependency_cache
           filters:
             tags:
               only: /.*/
-      - node8:
+      - node8_webpack_latest:
+          requires:
+            - dependency_cache
           filters:
             tags:
               only: /.*/
-      - node9:
+      - node9_webpack_latest:
+          requires:
+            - dependency_cache
+          filters:
+            tags:
+              only: /.*/
+      - node8_webpack_canary:
+          requires:
+            - dependency_cache
           filters:
             tags:
               only: /.*/
       - analysis:
           requires:
-            - node6
-            - node8
-            - node9
+            - node6_webpack_latest
+            - node8_webpack_latest
+            - node9_webpack_latest
           filters:
             tags:
               only: /.*/
+      - publish:
+          requires:
+            - node6_webpack_latest
+            - node8_webpack_latest
+            - node9_webpack_latest
+            - analysis
+          filters:
+            branches:
+              only:
+                - master

@@ -15,11 +15,6 @@ function toSafePath(originalPath) {
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
-    if (!('mode' in this.options)) {
-      this.options.mode = 'STANDARD';
-    } else if (this.options.mode !== 'STANDARD' && this.options.mode !== 'AGGRESSIVE_BUNDLE') {
-      this.options.mode = 'STANDARD';
-    }
     this.compilerFlags = compilerFlags || {};
   }
 
@@ -57,6 +52,11 @@ class ClosureCompilerPlugin {
             }
           });
         });
+      } else if (this.options.mode && this.options.mode !== 'STANDARD') {
+        this.reportErrors(compilation, [{
+          level: 'warn',
+          description: 'invalid plugin mode',
+        }]);
       }
 
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) => {
@@ -158,7 +158,7 @@ class ClosureCompilerPlugin {
 
     const allSources = [{
       path: '__webpack__base_module__',
-      src: ClosureCompilerPlugin.renderRuntime(scriptSrcPath),
+      src: '',
     }, {
       path: require.resolve('./aggressive-bundle-externs.js'),
       src: fs.readFileSync(require.resolve('./aggressive-bundle-externs.js'), 'utf8'),
@@ -167,7 +167,7 @@ class ClosureCompilerPlugin {
     const BASE_MODULE_NAME = 'required-base';
     const moduleDefs = [`${BASE_MODULE_NAME}:2`];
     let uniqueId = 1;
-    let runtimeNeeded = false;
+    let jsonpRuntimeRequired = false;
     const entryPoints = new Set();
     entryPoints.add(allSources[0].path);
     originalChunks.forEach((chunk) => {
@@ -187,10 +187,10 @@ class ClosureCompilerPlugin {
           compilation, chunk, allSources, BASE_MODULE_NAME, moduleDefs, uniqueId);
       }
 
-      // The runtime must be injected if at least one module
+      // The jsonp runtime must be injected if at least one module
       // is late loaded (doesn't include the runtime)
       if (!chunk.hasRuntime()) {
-        runtimeNeeded = true;
+        jsonpRuntimeRequired = true;
       }
     });
 
@@ -218,9 +218,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       return;
     }
 
-    if (!runtimeNeeded) {
-      allSources[0].src = '';
-    }
+    allSources[0].src = ClosureCompilerPlugin.renderRuntime(scriptSrcPath, jsonpRuntimeRequired);
 
     const defines = [];
     if (this.compilerFlags.define) {
@@ -235,9 +233,12 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       .filter(entryPoint => allSources.find(source => source.path === entryPoint));
 
     const moduleWrappers = moduleDefs.map((moduleDef) => {
+      if (/^required-base:/.test(moduleDef)) {
+        return 'required-base:var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);';
+      }
       const defParts = moduleDef.split(':');
       const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
-      if (runtimeNeeded) {
+      if (jsonpRuntimeRequired) {
         if (chunkIdParts) {
           return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
         }
@@ -458,10 +459,12 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    * runtime used by AGGRESSIVE_BUNDLE mode.
    *
    * @param {string} scriptSrcPath
+   * @param {boolean} lateLoadingSupport
    * @return {string}
    */
-  static renderRuntime(scriptSrcPath) {
-    return `${fs.readFileSync(require.resolve('./runtime.js'), 'utf8')}
+  static renderRuntime(scriptSrcPath, lateLoadingSupport = false) {
+    const runtimePath = lateLoadingSupport ? './basic-runtime.js' : './runtime.js';
+    return `${fs.readFileSync(require.resolve(runtimePath), 'utf8')}
 __webpack_require__.src = function(chunkId) {
   return __webpack_require__.p + ${scriptSrcPath};
 }

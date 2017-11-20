@@ -462,8 +462,8 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    * @param {boolean} lateLoadingSupport
    * @return {string}
    */
-  static renderRuntime(scriptSrcPath, lateLoadingSupport = false) {
-    const runtimePath = lateLoadingSupport ? './basic-runtime.js' : './runtime.js';
+  static renderRuntime(scriptSrcPath, lateLoadingSupport) {
+    const runtimePath = lateLoadingSupport ? './runtime.js' : './basic-runtime.js';
     return `${fs.readFileSync(require.resolve(runtimePath), 'utf8')}
 __webpack_require__.src = function(chunkId) {
   return __webpack_require__.p + ${scriptSrcPath};

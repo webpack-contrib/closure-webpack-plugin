@@ -79,6 +79,8 @@ class ClosureCompilerPlugin {
   standardBundle(compilation, originalChunks, cb) {
     let uniqueId = 1;
     let compilationChain = Promise.resolve();
+    const chunkMap = ClosureCompilerPlugin.buildChunkMap(originalChunks);
+    const chunkFlatMap = ClosureCompilerPlugin.buildChunkFlatMap(chunkMap);
     originalChunks.forEach((chunk) => {
       if (chunk.parents.length !== 0) {
         return;
@@ -86,7 +88,7 @@ class ClosureCompilerPlugin {
       const moduleDefs = [];
       const sources = [];
       uniqueId += this.addChunksToCompilation(
-        compilation, chunk, sources, null, moduleDefs, uniqueId);
+        compilation, chunk, sources, chunkFlatMap, null, moduleDefs, uniqueId);
 
       const compilationOptions = Object.assign(
         {},
@@ -136,26 +138,6 @@ class ClosureCompilerPlugin {
    * a different output chunk are rewritten to be properties on a __wpcc namespace.
    */
   aggressiveBundle(compilation, originalChunks, cb) {
-    const entryChunk = originalChunks.find(chunk => chunk.hasEntryModule() && chunk.hasRuntime());
-    const chunkMaps = entryChunk.getChunkMaps();
-    const scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall('asset-path',
-      JSON.stringify(compilation.outputOptions.chunkFilename), {
-        hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(entryChunk.renderedHash)} + "`,
-        hashWithLength: length => `" + ${compilation.mainTemplate.renderCurrentHashCode(entryChunk.renderedHash, length)} + "`,
-        chunk: {
-          id: '" + chunkId + "',
-          hash: `" + ${JSON.stringify(chunkMaps.hash)}[chunkId] + "`,
-          hashWithLength(length) {
-            const shortChunkHashMap = Object.create(null);
-            Object.keys(chunkMaps.hash).forEach((chunkId) => {
-              if (typeof chunkMaps.hash[chunkId] === 'string') { shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(0, length); }
-            });
-            return `" + ${JSON.stringify(shortChunkHashMap)}[chunkId] + "`;
-          },
-          name: `" + (${JSON.stringify(chunkMaps.name)}[chunkId]||chunkId) + "`,
-        },
-      });
-
     const allSources = [{
       path: '__webpack__base_module__',
       src: '',
@@ -163,6 +145,9 @@ class ClosureCompilerPlugin {
       path: require.resolve('./aggressive-bundle-externs.js'),
       src: fs.readFileSync(require.resolve('./aggressive-bundle-externs.js'), 'utf8'),
     }];
+
+    const chunkMap = ClosureCompilerPlugin.buildChunkMap(originalChunks);
+    const chunkFlatMap = ClosureCompilerPlugin.buildChunkFlatMap(chunkMap);
 
     const BASE_MODULE_NAME = 'required-base';
     const moduleDefs = [`${BASE_MODULE_NAME}:2`];
@@ -184,7 +169,7 @@ class ClosureCompilerPlugin {
       }
       if (chunk.parents.length === 0) {
         uniqueId += this.addChunksToCompilation(
-          compilation, chunk, allSources, BASE_MODULE_NAME, moduleDefs, uniqueId);
+          compilation, chunk, allSources, chunkFlatMap, BASE_MODULE_NAME, moduleDefs, uniqueId);
       }
 
       // The jsonp runtime must be injected if at least one module
@@ -218,7 +203,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       return;
     }
 
-    allSources[0].src = ClosureCompilerPlugin.renderRuntime(scriptSrcPath, jsonpRuntimeRequired);
+    allSources[0].src = ClosureCompilerPlugin.renderRuntime(compilation, chunkMap, jsonpRuntimeRequired);
 
     const defines = [];
     if (this.compilerFlags.define) {
@@ -380,7 +365,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     });
   }
 
-  addChunksToCompilation(compilation, chunk, sources, baseModule, moduleDefs, nextUniqueId) {
+  addChunksToCompilation(compilation, chunk, sources, chunkMap, baseModule, moduleDefs, nextUniqueId) {
     let chunkSources;
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       chunkSources = ClosureCompilerPlugin.getChunkSources(chunk, () => {
@@ -413,11 +398,70 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       moduleDef += `:${baseModule}`;
     }
     moduleDefs.push(moduleDef);
-    chunk.chunks.forEach((nestedChunk) => {
-      nextUniqueId += this.addChunksToCompilation( // eslint-disable-line no-param-reassign
-        compilation, nestedChunk, sources, chunkName, moduleDefs, nextUniqueId);
+
+    chunkMap.forEach((parentChunk, childChunk) => {
+      if (parentChunk === chunk) {
+        nextUniqueId += this.addChunksToCompilation( // eslint-disable-line no-param-reassign
+          compilation, childChunk, sources, chunkMap, chunkName, moduleDefs, nextUniqueId);
+      }
     });
+
     return nextUniqueId;
+  }
+
+  /**
+   * Build a map of chunks to parentChunks to indicate the relationship between them.
+   */
+  static buildChunkMap(allChunks, startingChunk = null) {
+    function isTargetChunk(chunk) {
+      if (startingChunk === null) {
+        return chunk.parents.length === 0;
+      }
+      return chunk.parents.includes(startingChunk);
+    }
+
+    const chunkMap = new Map();
+    allChunks.forEach((chunk) => {
+      if (isTargetChunk(chunk)) {
+        const childChunksMap = this.buildChunkMap(allChunks, chunk);
+
+        // The Commons Chunk plugin can create an extra async chunk which is a
+        // logical parent of the other chunks at the same level. We need to move
+        // the other chunks to be actual parents in our chunk map so that
+        // closure-compiler properly understands the relationships.
+        const childrenOfAsyncChunkMap = new Map();
+        let extraAsyncChunkMap;
+        childChunksMap.forEach((grandchildrenChunkMap, childChunk) => {
+          if (childChunk.extraAsync) {
+            extraAsyncChunkMap = grandchildrenChunkMap;
+          } else {
+            childrenOfAsyncChunkMap.set(childChunk, grandchildrenChunkMap);
+          }
+        });
+        if (extraAsyncChunkMap && childrenOfAsyncChunkMap.size !== childChunksMap.size) {
+          childrenOfAsyncChunkMap.forEach((grandchildrenChunkMap, childChunk) => {
+            childChunksMap.delete(childChunk);
+            extraAsyncChunkMap.set(childChunk, grandchildrenChunkMap);
+          });
+        }
+
+        chunkMap.set(chunk, childChunksMap);
+      }
+    });
+
+    return chunkMap;
+  }
+
+  static buildChunkFlatMap(chunkMap) {
+    const chunkFlatMap = new Map();
+    function addChunksToFlatMap(parentChunk, childChunkMap) {
+      childChunkMap.forEach((grandchildChunkMap, childChunk) => {
+        chunkFlatMap.set(childChunk, parentChunk);
+        addChunksToFlatMap(childChunk, grandchildChunkMap);
+      });
+    }
+    addChunksToFlatMap(null, chunkMap);
+    return chunkFlatMap;
   }
 
   static getChunkSources(chunk, getUniqueId) {
@@ -458,17 +502,45 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    * Given the source path of the output destination, return the custom
    * runtime used by AGGRESSIVE_BUNDLE mode.
    *
-   * @param {string} scriptSrcPath
+   * @param {?} compilation - webpack
+   * @param {Map} chunks Tree map of chunks and child chunks
    * @param {boolean} lateLoadingSupport
    * @return {string}
    */
-  static renderRuntime(scriptSrcPath, lateLoadingSupport) {
-    const runtimePath = lateLoadingSupport ? './runtime.js' : './basic-runtime.js';
-    return `${fs.readFileSync(require.resolve(runtimePath), 'utf8')}
-__webpack_require__.src = function(chunkId) {
-  return __webpack_require__.p + ${scriptSrcPath};
-}
-`;
+  static renderRuntime(compilation, chunks, lateLoadingSupport) {
+    if (!lateLoadingSupport) {
+      return fs.readFileSync(require.resolve('./basic-runtime.js'), 'utf8');
+    }
+
+    const srcPathPerChunk = [];
+    function setChunkPaths(parentChunk, childChunksMap, chunkMaps) {
+      const scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall('asset-path',
+        JSON.stringify(compilation.outputOptions.chunkFilename), {
+          hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(compilation.hash)} + "`,
+          hashWithLength: length => `" + ${compilation.mainTemplate.renderCurrentHashCode(compilation.hash, length)} + "`,
+          chunk: {
+            id: `${parentChunk.id}`,
+            hash: chunkMaps[parentChunk.id],
+            hashWithLength(length) {
+              const shortChunkHashMap = Object.create(null);
+              Object.keys(chunkMaps.hash).forEach((chunkId) => {
+                if (typeof chunkMaps.hash[chunkId] === 'string') { shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(0, length); }
+              });
+              return shortChunkHashMap[parentChunk.id];
+            },
+            name: chunkMaps.name || parentChunk.id,
+          },
+        });
+      srcPathPerChunk.push(`_WEBPACK_SOURCE_[${parentChunk.id}] = ${JSON.stringify(scriptSrcPath)}`);
+      childChunksMap.forEach((grandchildrenChunksMap, childChunk) => {
+        setChunkPaths(childChunk, grandchildrenChunksMap, chunkMaps);
+      });
+    }
+    chunks.forEach((childChunksMap, entryChunk) => {
+      setChunkPaths(entryChunk, childChunksMap, entryChunk.getChunkMaps());
+    });
+
+    return `${fs.readFileSync(require.resolve('./runtime.js'), 'utf8')}\n${srcPathPerChunk.join('\n')}`;
   }
 
   /**

@@ -5,6 +5,7 @@ const RequestShortener = require('webpack/lib/RequestShortener');
 const HarmonyImportDependencyTemplate = require('./harmony-import-dependency-template');
 const HarmonyImportSpecifierDependencyTemplate = require('./harmony-import-specifier-dependency-template');
 const HarmonyNoopTemplate = require('./harmony-noop-template');
+const ImportDependencyTemplate = require('./import-dependency-template');
 const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
 
 const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/ig;
@@ -28,12 +29,8 @@ class ClosureCompilerPlugin {
         Promise.resolve().then(() => {
           compilation.dependencyTemplates.forEach((val, key) => {
             switch (key.name) {
-              case 'HarmonyImportSpecifierDependency':
-                compilation.dependencyTemplates.set(key, new HarmonyImportSpecifierDependencyTemplate());
-                break;
-
-              case 'HarmonyImportDependency':
-                compilation.dependencyTemplates.set(key, new HarmonyImportDependencyTemplate());
+              case 'AMDDefineDependency':
+                compilation.dependencyTemplates.set(key, new AMDDefineDependencyTemplate());
                 break;
 
               case 'HarmonyCompatibilityDependency':
@@ -44,9 +41,20 @@ class ClosureCompilerPlugin {
                 compilation.dependencyTemplates.set(key, new HarmonyNoopTemplate());
                 break;
 
-              case 'AMDDefineDependency':
-                compilation.dependencyTemplates.set(key, new AMDDefineDependencyTemplate());
+              case 'HarmonyImportDependency':
+                compilation.dependencyTemplates.set(key, new HarmonyImportDependencyTemplate());
                 break;
+
+              case 'HarmonyImportSpecifierDependency':
+                compilation.dependencyTemplates.set(key, new HarmonyImportSpecifierDependencyTemplate());
+                break;
+
+              case 'ImportDependency':
+                if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
+                  compilation.dependencyTemplates.set(key, new ImportDependencyTemplate());
+                }
+                break;
+
               default:
                 break;
             }
@@ -520,24 +528,26 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           hashWithLength: length => `" + ${compilation.mainTemplate.renderCurrentHashCode(compilation.hash, length)} + "`,
           chunk: {
             id: `${parentChunk.id}`,
-            hash: chunkMaps[parentChunk.id],
+            hash: chunkMaps[parentChunk.id] || parentChunk.hash,
             hashWithLength(length) {
               const shortChunkHashMap = Object.create(null);
               Object.keys(chunkMaps.hash).forEach((chunkId) => {
                 if (typeof chunkMaps.hash[chunkId] === 'string') { shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(0, length); }
               });
-              return shortChunkHashMap[parentChunk.id];
+              return shortChunkHashMap[parentChunk.id] || parentChunk.hash.substr(0, length);
             },
-            name: chunkMaps.name || parentChunk.id,
+            name: parentChunk.name || parentChunk.id,
           },
         });
-      srcPathPerChunk.push(`_WEBPACK_SOURCE_[${parentChunk.id}] = ${JSON.stringify(scriptSrcPath)}`);
+      srcPathPerChunk.push(`_WEBPACK_SOURCE_[${parentChunk.id}] = ${scriptSrcPath}`);
       childChunksMap.forEach((grandchildrenChunksMap, childChunk) => {
         setChunkPaths(childChunk, grandchildrenChunksMap, chunkMaps);
       });
     }
     chunks.forEach((childChunksMap, entryChunk) => {
-      setChunkPaths(entryChunk, childChunksMap, entryChunk.getChunkMaps());
+      childChunksMap.forEach((grandchildChunksMap, childChunk) => {
+        setChunkPaths(childChunk, grandchildChunksMap, entryChunk.getChunkMaps());
+      });
     });
 
     return `${fs.readFileSync(require.resolve('./runtime.js'), 'utf8')}\n${srcPathPerChunk.join('\n')}`;

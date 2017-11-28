@@ -1,23 +1,28 @@
 /* eslint-env browser */
 /* eslint no-underscore-dangle: "off", camelcase: "off", no-var: "off", prefer-destructuring: "off",
      no-multi-assign: "off", dot-notation: "off", prefer-arrow-callback: "off", vars-on-top: "off",
-     prefer-template: "off" */
-// webpackBootstrap
+     prefer-template: "off", no-unused-vars: "off", func-names: "off" */
+/**
+ * @fileoverview webpack bootstrap for Closure-compiler with
+ * late-loaded chunk support.
+ *
+ * This file is restricted to ES5 syntax so that it does not
+ * require transpilation. While it does use Promises, they
+ * can be polyfilled without transpilation.
+ */
+
 /** @const */
 var _WEBPACK_GLOBAL_THIS_ = this;
 
 var __webpack_require__;
 if (typeof __webpack_require__ === 'undefined') {
-  __webpack_require__ = function (m) {}; // eslint-disable-line func-names, no-unused-vars
+  __webpack_require__ = function (m) {};
 }
 
 var _WEBPACK_MODULE_CACHE_;
 if (typeof _WEBPACK_MODULE_CACHE_ === 'undefined') {
   _WEBPACK_MODULE_CACHE_ = {};
 }
-
-/** @define {string} */
-var _WEBPACK_NONCE_ = '';
 
 /** @define {number} */
 var _WEBPACK_TIMEOUT_ = 120000;
@@ -35,14 +40,14 @@ var _WEBPACK_SOURCE_ = {};
 var _WEBPACK_ASYNC_LOADING_CHUNKS_ = {};
 
 // install a JSONP callback for chunk loading
-(function init() {
+(function () {
   /** @type {undefined|function(!Array<number>, function(Object))} */
   var parentJsonpFunction = window['webpackJsonp'];
   /**
    * @param {!Array<number>} chunkIds
    * @param {function(Object)} cb
    */
-  window['webpackJsonp'] = function webpackJsonpCallback(chunkIds, cb) {
+  window['webpackJsonp'] = function (chunkIds, cb) {
     var chunkId;
     var i = 0;
     var resolves = [];
@@ -74,10 +79,10 @@ var _WEBPACK_ASYNC_LOADING_CHUNKS_ = {};
       _WEBPACK_MODULE_CACHE_[chunkId] = 0;
     }
     if (parentJsonpFunction) {
-      parentJsonpFunction(chunkIds, function parentJsonp() {});
+      parentJsonpFunction(chunkIds, function () {});
     }
     while (resolves.length) {
-      resolves.shift()(); // eslint-disable-line no-undefined
+      resolves.shift()();
     }
   };
 }());
@@ -87,7 +92,7 @@ var _WEBPACK_ASYNC_LOADING_CHUNKS_ = {};
  * @param {...number} chunkId
  * @return {!Promise}
  */
-__webpack_require__.e = function requireEnsure(chunkId) {
+__webpack_require__.e = function (chunkId) {
   // If more than 1 chunk id is passed, load all of the chunks async
   // but execute the callbacks in the provided order.
   if (arguments.length > 1) {
@@ -97,7 +102,7 @@ __webpack_require__.e = function requireEnsure(chunkId) {
       _WEBPACK_ASYNC_LOADING_CHUNKS_[chunkIds[i]] = true;
       chunksLoading.push(__webpack_require__.e(chunkIds[i]));
     }
-    return Promise.all(chunksLoading).then(function executeChunksInOrder(cbs) {
+    return Promise.all(chunksLoading).then(function (cbs) {
       for (var j = 0; j < cbs.length; j++) {
         if (cbs[j]) {
           cbs[j].call(_WEBPACK_GLOBAL_THIS_, __wpcc); // eslint-disable-line no-undef
@@ -118,10 +123,10 @@ __webpack_require__.e = function requireEnsure(chunkId) {
   }
 
   // setup Promise in chunk cache
-  var promise = new Promise(function loaded(resolve, reject) {
+  var promise = new Promise(function (resolve, reject) {
     installedChunkData = _WEBPACK_MODULE_CACHE_[chunkId] = [resolve, reject];
   });
-  installedChunkData[2] = promise.then(function loadComplete() {});
+  installedChunkData[2] = promise.then(function () {});
 
   // start chunk loading
   var head = document.getElementsByTagName('head')[0];
@@ -131,8 +136,8 @@ __webpack_require__.e = function requireEnsure(chunkId) {
   script.async = true;
   script.timeout = _WEBPACK_TIMEOUT_;
 
-  if (_WEBPACK_NONCE_.length > 0) {
-    script.setAttribute('nonce', _WEBPACK_NONCE_);
+  if (__wpcc.nc && __wpcc.nc.length > 0) { // eslint-disable-line no-undef
+    script.setAttribute('nonce', __wpcc.nc); // eslint-disable-line no-undef
   }
   script.src = _WEBPACK_SOURCE_[chunkId];
   var timeout = setTimeout(onScriptComplete, _WEBPACK_TIMEOUT_);
@@ -159,4 +164,4 @@ __webpack_require__.e = function requireEnsure(chunkId) {
  * on error function for async loading
  * @param {Error} err
  */
-__webpack_require__.oe = function oe(err) { console.error(err); throw err; }; // eslint-disable-line no-console
+__webpack_require__.oe = function (err) { console.error(err); throw err; }; // eslint-disable-line no-console

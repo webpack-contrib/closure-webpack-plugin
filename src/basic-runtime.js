@@ -14,6 +14,9 @@
  */
 var _WEBPACK_SOURCE_ = {};
 
+/** @define {number} */
+var _WEBPACK_TIMEOUT_ = 120000;
+
 var __webpack_require__;
 if (typeof __webpack_require__ === 'undefined') {
   __webpack_require__ = function (m) {};

@@ -2,6 +2,8 @@
 /* eslint no-underscore-dangle: "off", camelcase: "off", no-var: "off", prefer-destructuring: "off",
      no-multi-assign: "off", dot-notation: "off", prefer-arrow-callback: "off", vars-on-top: "off",
      prefer-template: "off", no-unused-vars: "off", func-names: "off" */
+/* global __wpcc, _WEBPACK_SOURCE_, __webpack_require__, _WEBPACK_TIMEOUT_ */
+
 /**
  * @fileoverview webpack bootstrap for Closure-compiler with
  * late-loaded chunk support.
@@ -14,30 +16,10 @@
 /** @const */
 var _WEBPACK_GLOBAL_THIS_ = this;
 
-var __webpack_require__;
-if (typeof __webpack_require__ === 'undefined') {
-  __webpack_require__ = function (m) {};
-}
-
 var _WEBPACK_MODULE_CACHE_;
 if (typeof _WEBPACK_MODULE_CACHE_ === 'undefined') {
   _WEBPACK_MODULE_CACHE_ = {};
 }
-
-/** @define {number} */
-var _WEBPACK_TIMEOUT_ = 120000;
-
-/**
- * @const
- * @type {!Object<number, string>}
- */
-var _WEBPACK_SOURCE_ = {};
-
-/**
- * @const
- * @type {!Object<number, boolean>}
- */
-var _WEBPACK_ASYNC_LOADING_CHUNKS_ = {};
 
 // install a JSONP callback for chunk loading
 (function () {
@@ -48,73 +30,37 @@ var _WEBPACK_ASYNC_LOADING_CHUNKS_ = {};
    * @param {function(Object)} cb
    */
   window['webpackJsonp'] = function (chunkIds, cb) {
-    var chunkId;
-    var i = 0;
+    var i;
     var resolves = [];
-    var isAsyncLoading = false;
-
-    for (i = 0; i < chunkIds.length; i++) {
-      if (_WEBPACK_ASYNC_LOADING_CHUNKS_[chunkIds[i]]) {
-        isAsyncLoading = true;
-      }
-    }
-
-    if (!isAsyncLoading) {
-      // Execute the loaded chunk passing in the namespace
-      cb.call(_WEBPACK_GLOBAL_THIS_, __wpcc); // eslint-disable-line no-undef
-    }
 
     // Register all the new chunks as loaded and then resolve the promise
     for (i = 0; i < chunkIds.length; i++) {
-      chunkId = chunkIds[i];
-      if (_WEBPACK_MODULE_CACHE_[chunkId]) {
-        var resolve = _WEBPACK_MODULE_CACHE_[chunkId][0];
-        if (isAsyncLoading) {
-          resolve = resolve.bind(null, cb);
-          isAsyncLoading = false;
-        }
-
-        resolves.push(resolve);
+      if (_WEBPACK_MODULE_CACHE_[chunkIds[i]]) {
+        resolves.push(_WEBPACK_MODULE_CACHE_[chunkIds[i]][0]);
+        _WEBPACK_MODULE_CACHE_[chunkIds[i]] = 0;
       }
-      _WEBPACK_MODULE_CACHE_[chunkId] = 0;
     }
     if (parentJsonpFunction) {
       parentJsonpFunction(chunkIds, function () {});
     }
+    var executionCallback = cb;
     while (resolves.length) {
-      resolves.shift()();
+      resolves.shift()(cb);
+      executionCallback = undefined; // eslint-disable-line no-undefined
     }
   };
 }());
 
 /**
- * The chunk loading function for additional chunks
- * @param {...number} chunkId
- * @return {!Promise}
+ * @param {number} chunkId
+ * @param {!Promise} basePromise
+ * @returns {!Promise}
+ * @private
  */
-__webpack_require__.e = function (chunkId) {
-  // If more than 1 chunk id is passed, load all of the chunks async
-  // but execute the callbacks in the provided order.
-  if (arguments.length > 1) {
-    var chunkIds = Array.prototype.slice.call(arguments); // eslint-disable-line prefer-rest-params
-    var chunksLoading = [];
-    for (var i = 0; i < chunkIds.length; i++) {
-      _WEBPACK_ASYNC_LOADING_CHUNKS_[chunkIds[i]] = true;
-      chunksLoading.push(__webpack_require__.e(chunkIds[i]));
-    }
-    return Promise.all(chunksLoading).then(function (cbs) {
-      for (var j = 0; j < cbs.length; j++) {
-        if (cbs[j]) {
-          cbs[j].call(_WEBPACK_GLOBAL_THIS_, __wpcc); // eslint-disable-line no-undef
-        }
-        _WEBPACK_ASYNC_LOADING_CHUNKS_[chunkIds[j]] = false;
-      }
-    });
-  }
-
+function _webpack_load_chunk_(chunkId, basePromise) {
   var installedChunkData = _WEBPACK_MODULE_CACHE_[chunkId];
   if (installedChunkData === 0) {
-    return Promise.resolve();
+    return basePromise;
   }
 
   // a Promise means "currently loading".
@@ -125,8 +71,14 @@ __webpack_require__.e = function (chunkId) {
   // setup Promise in chunk cache
   var promise = new Promise(function (resolve, reject) {
     installedChunkData = _WEBPACK_MODULE_CACHE_[chunkId] = [resolve, reject];
+  }).then(function (cb) {
+    return basePromise.then(function () {
+      if (cb) {
+        cb.call(_WEBPACK_GLOBAL_THIS_, __wpcc);
+      }
+    });
   });
-  installedChunkData[2] = promise.then(function () {});
+  installedChunkData[2] = promise;
 
   // start chunk loading
   var head = document.getElementsByTagName('head')[0];
@@ -136,8 +88,8 @@ __webpack_require__.e = function (chunkId) {
   script.async = true;
   script.timeout = _WEBPACK_TIMEOUT_;
 
-  if (__wpcc.nc && __wpcc.nc.length > 0) { // eslint-disable-line no-undef
-    script.setAttribute('nonce', __wpcc.nc); // eslint-disable-line no-undef
+  if (__wpcc.nc && __wpcc.nc.length > 0) {
+    script.setAttribute('nonce', __wpcc.nc);
   }
   script.src = _WEBPACK_SOURCE_[chunkId];
   var timeout = setTimeout(onScriptComplete, _WEBPACK_TIMEOUT_);
@@ -152,11 +104,24 @@ __webpack_require__.e = function (chunkId) {
         chunk[1](new Error('Loading chunk ' + chunkId + ' failed.'));
       }
       _WEBPACK_MODULE_CACHE_[chunkId] = undefined; // eslint-disable-line no-undefined
-      _WEBPACK_ASYNC_LOADING_CHUNKS_[chunkId] = false;
     }
   }
   head.appendChild(script);
+  return promise;
+}
 
+/**
+ * The chunk loading function for additional chunks
+ *
+ * @type {function(...number):!Promise}
+ */
+__webpack_require__.e = function () {
+  var chunkIds = Array.prototype.slice.call(arguments); // eslint-disable-line prefer-rest-params
+
+  var promise = Promise.resolve();
+  for (var i = 0; i < chunkIds.length; i++) {
+    promise = _webpack_load_chunk_(chunkIds[i], promise);
+  }
   return promise;
 };
 

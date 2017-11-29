@@ -146,23 +146,28 @@ class ClosureCompilerPlugin {
    * a different output chunk are rewritten to be properties on a __wpcc namespace.
    */
   aggressiveBundle(compilation, originalChunks, cb) {
-    const allSources = [{
-      path: '__webpack__base_module__',
-      src: '',
-    }, {
-      path: require.resolve('./aggressive-bundle-externs.js'),
-      src: fs.readFileSync(require.resolve('./aggressive-bundle-externs.js'), 'utf8'),
-    }];
+    const basicRuntimePath = require.resolve('./basic-runtime.js');
+    const externsPath = require.resolve('./aggressive-bundle-externs.js');
+    const allSources = [
+      {
+        path: externsPath,
+        src: fs.readFileSync(externsPath, 'utf8'),
+      },
+      {
+        path: basicRuntimePath,
+        src: fs.readFileSync(basicRuntimePath, 'utf8'),
+      }];
+
+    let baseModuleCount = allSources.length;
 
     const chunkMap = ClosureCompilerPlugin.buildChunkMap(originalChunks);
     const chunkFlatMap = ClosureCompilerPlugin.buildChunkFlatMap(chunkMap);
 
     const BASE_MODULE_NAME = 'required-base';
-    const moduleDefs = [`${BASE_MODULE_NAME}:2`];
+    const moduleDefs = [`${BASE_MODULE_NAME}:${baseModuleCount}`];
     let uniqueId = 1;
     let jsonpRuntimeRequired = false;
     const entryPoints = new Set();
-    entryPoints.add(allSources[0].path);
     originalChunks.forEach((chunk) => {
       if (chunk.hasEntryModule()) {
         if (chunk.entryModule.userRequest) {
@@ -211,7 +216,11 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       return;
     }
 
-    allSources[0].src = ClosureCompilerPlugin.renderRuntime(compilation, chunkMap, jsonpRuntimeRequired);
+    if (jsonpRuntimeRequired) {
+      allSources.splice(2, 0, ClosureCompilerPlugin.renderRuntime(compilation, chunkMap));
+      baseModuleCount += 1;
+      moduleDefs[0] = `${BASE_MODULE_NAME}:${baseModuleCount}`;
+    }
 
     const defines = [];
     if (this.compilerFlags.define) {
@@ -225,20 +234,29 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
     const filteredEntryPoints = Array.from(entryPoints)
       .filter(entryPoint => allSources.find(source => source.path === entryPoint));
+    filteredEntryPoints.unshift(...allSources.slice(1, baseModuleCount).map(entry => entry.path));
 
+    const entryChunkWrapper = 'var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);';
     const moduleWrappers = moduleDefs.map((moduleDef) => {
       if (/^required-base:/.test(moduleDef)) {
-        return 'required-base:var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);';
+        return `required-base:${entryChunkWrapper}`;
       }
       const defParts = moduleDef.split(':');
       const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
-      if (jsonpRuntimeRequired) {
-        if (chunkIdParts) {
-          return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
-        }
-        return `${defParts[0]}:var __wpcc;if(typeof __wpcc === 'undefined')__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);`;
+      let parentChunk = null;
+      if (chunkIdParts) {
+        const chunkId = parseInt(chunkIdParts[1], 10);
+        chunkFlatMap.forEach((parent, chunk) => {
+          if (chunk && chunk.id === chunkId) {
+            parentChunk = parent;
+          }
+        });
+      }
+
+      if (parentChunk !== null) {
+        return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
       } else if (chunkIdParts) {
-        return `${defParts[0]}:var __wpcc;if(typeof __wpcc === 'undefined')__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);`;
+        return `${defParts[0]}:${entryChunkWrapper}`;
       }
 
       return null;
@@ -513,14 +531,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    *
    * @param {?} compilation - webpack
    * @param {Map} chunks Tree map of chunks and child chunks
-   * @param {boolean} lateLoadingSupport
    * @return {string}
    */
-  static renderRuntime(compilation, chunks, lateLoadingSupport) {
-    if (!lateLoadingSupport) {
-      return fs.readFileSync(require.resolve('./basic-runtime.js'), 'utf8');
-    }
-
+  static renderRuntime(compilation, chunks) {
     const srcPathPerChunk = [];
     function setChunkPaths(parentChunk, childChunksMap, chunkMaps) {
       const scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall('asset-path',
@@ -551,7 +564,11 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       });
     });
 
-    return `${fs.readFileSync(require.resolve('./runtime.js'), 'utf8')}\n${srcPathPerChunk.join('\n')}`;
+    const lateLoadedRuntimePath = require.resolve('./runtime.js');
+    return {
+      path: lateLoadedRuntimePath,
+      src: `${fs.readFileSync(lateLoadedRuntimePath, 'utf8')}\n${srcPathPerChunk.join('\n')}`,
+    };
   }
 
   /**

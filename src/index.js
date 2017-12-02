@@ -232,6 +232,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     }
     defines.push(`_WEBPACK_TIMEOUT_=${compilation.outputOptions.chunkLoadTimeout}`);
 
+    const PUBLIC_PATH = compilation.mainTemplate.getPublicPath({ hash: compilation.hash });
+    defines.push(`_WEBPACK_PUBLIC_PATH_='${PUBLIC_PATH}'`);
+
     const filteredEntryPoints = Array.from(entryPoints)
       .filter(entryPoint => allSources.find(source => source.path === entryPoint));
     filteredEntryPoints.unshift(...allSources.slice(1, baseModuleCount).map(entry => entry.path));

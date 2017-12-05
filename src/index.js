@@ -17,6 +17,13 @@ class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
     this.compilerFlags = compilerFlags || {};
+    if (typeof this.options.childCompilations === 'boolean') {
+      this.options.childCompilations = function childCompilationSupported(childrenSupported) {
+        return childrenSupported;
+      }.bind(this, this.options.childCompilations);
+    } else if (typeof this.options.childCompilations !== 'function') {
+      this.options.childCompilations = function childCompilationSupported() { return false; };
+    }
   }
 
   apply(compiler) {
@@ -68,13 +75,6 @@ class ClosureCompilerPlugin {
       }
 
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) => {
-        // Disable the compiler for child compilations which are named.
-        // Probably want an option to control this.
-        if (compilation.name) {
-          cb();
-          return;
-        }
-
         if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
           this.aggressiveBundle(compilation, originalChunks, cb);
         } else {

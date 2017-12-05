@@ -26,17 +26,27 @@ new ClosureCompilerPlugin({mode: 'STANDARD'}, {
 ## Options
 
  * **mode** - `STANDARD` (default) or `AGGRESSIVE_BUNDLE`. Controls how the plugin utilizes the compiler.  
-    In `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.  
-    In `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but
+    - In `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.  
+    - In `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but
 is not compatible with all input modules.
+ * **childCompilations** - boolean or function. Defaults to `false`.
+  In order to decrease build times, this plugin by default only operates on the main compilation.
+  Plugins such as extract-text-plugin and html-webpack-plugin run as child compilations and
+  usually do not need transpilation or minification. You can enable this for all child compilations
+  by setting this option to `true`. For specific control, the option can be set to a function which
+  will be passed a compilation object.  
+  Example: `function(compilation) { return /html-webpack/.test(compilation.name); }`.
 
 ## Compiler Flags
 
-The plugin controls certain compiler flags. The following flags should not be used in any mode:
+The plugin controls several compiler flags. The following flags should not be used in any mode:
 
- * **module_resolution** - A custom resolution mode for webpack is utilized instead of the standard NODE or BROWSER options.
- * **output_wrapper** - The output wrapper is automatically added by either webpack or the plugin
- * **dependency_mode** - Controlled by the plugin mode.
+ * module_resolution
+ * output_wrapper
+ * dependency_mode
+ * create_souce_map
+ * module
+ * entry_point
 
 ## Aggressive Bundle Mode
 

@@ -1,0 +1,13 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Closure: Compiler flags externs array of paths 1`] = `
+"'use strict';(function(e){function b(a){if(d[a])return d[a].a;var c=d[a]={m:a,f:!1,a:{}};e[a].call(c.a,c,c.a,b);c.f=!0;return c.a}var d={};b.l=e;b.j=d;b.b=function(a,c){b.c(a)||Object.defineProperty(a,\\"a\\",{configurable:!1,enumerable:!0,get:c})};b.h=function(a){var c=a&&a.g?function(){return a[\\"default\\"]}:function(){return a};b.b(c,c);return c};b.c=function(a){return Object.prototype.hasOwnProperty.call(a,\\"a\\")};b.i=\\"\\";return b(b.o=0)})([function(){test(1);test2(2)}]);
+
+//# sourceMappingURL=main.bundle.js.map"
+`;
+
+exports[`Closure: Compiler flags externs only path 1`] = `
+"'use strict';(function(e){function b(a){if(d[a])return d[a].a;var c=d[a]={m:a,f:!1,a:{}};e[a].call(c.a,c,c.a,b);c.f=!0;return c.a}var d={};b.l=e;b.j=d;b.b=function(a,c){b.c(a)||Object.defineProperty(a,\\"a\\",{configurable:!1,enumerable:!0,get:c})};b.h=function(a){var c=a&&a.g?function(){return a[\\"default\\"]}:function(){return a};b.b(c,c);return c};b.c=function(a){return Object.prototype.hasOwnProperty.call(a,\\"a\\")};b.i=\\"\\";return b(b.o=0)})([function(){test(1)}]);
+
+//# sourceMappingURL=main.bundle.js.map"
+`;

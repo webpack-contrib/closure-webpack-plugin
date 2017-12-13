@@ -33,6 +33,9 @@
   "devDependencies": {
     "@commitlint/cli": "^5.0.0",
     "@commitlint/config-angular": "^5.0.0",
+    "babel-core": "^6.26.0",
+    "babel-jest": "^21.2.0",
+    "babel-preset-env": "^1.6.1",
     "conventional-github-releaser": "^2.0.0",
     "cross-env": "^5.0.5",
     "del-cli": "^1.1.0",

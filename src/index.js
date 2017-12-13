@@ -106,12 +106,17 @@ class ClosureCompilerPlugin {
           module: moduleDefs,
         });
 
-      if (!compilationOptions.externs) {
-        compilationOptions.externs = [];
-      } else if (typeof compilationOptions.externs === 'string') {
-        compilationOptions.externs = [compilationOptions.externs];
+      let externs = [];
+
+      externs.push(require.resolve('./standard-externs.js'));
+
+      if (Array.isArray(compilationOptions.externs)) {
+        externs = externs.concat(compilationOptions.externs);
+      } else if (compilationOptions.externs != null) {
+        externs.push(compilationOptions.externs);
       }
-      compilationOptions.externs = require.resolve('./standard-externs.js');
+
+      compilationOptions.externs = externs;
 
       compilationChain = compilationChain
         .then(() => this.runCompiler(compilation, compilationOptions, sources)

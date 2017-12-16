@@ -5,7 +5,7 @@
 [Closure-Compiler](https://developers.google.com/closure/compiler/) is a full optimizing compiler and transpiler.
 It offers unmatched optimizations, provides type checking and can easily target transpilation to different versions of ECMASCRIPT.
 
-**Note:** This plugin is a very early beta and currently uses a custom build of closure-compiler while neccessary changes are integrated back into the main compiler repository.
+**Note:** This plugin is a very early beta and currently uses a custom build of closure-compiler while necessary changes are integrated back into the main compiler repository.
 Only the java version of closure-compiler is currently supported.
 
 ## Usage example
@@ -44,7 +44,7 @@ The plugin controls several compiler flags. The following flags should not be us
  * module_resolution
  * output_wrapper
  * dependency_mode
- * create_souce_map
+ * create_source_map
  * module
  * entry_point
 

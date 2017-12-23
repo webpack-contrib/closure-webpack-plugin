@@ -1,9 +1,8 @@
 {
   "name": "closure-webpack-plugin",
   "version": "0.0.17",
-  "description": "Webpack Google Closure Compiler plugin",
+  "description": "Webpack Google Closure Compiler and Closure Library plugin",
   "author": "Chad Killingsworth (@ChadKillingsworth)",
-  "description": "Webpack Google Closure Compiler plugin",
   "license": "MIT",
   "main": "src/index.js",
   "files": [

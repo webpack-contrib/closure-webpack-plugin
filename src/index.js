@@ -30,6 +30,10 @@ class ClosureCompilerPlugin {
     this.requestShortener = new RequestShortener(compiler.context);
 
     compiler.plugin('compilation', (compilation) => {
+      if (compilation.compiler.parentCompilation && !this.options.childCompilations(compilation)) {
+        return;
+      }
+
       if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
         // It's very difficult to override a specific dependency template without rewriting the entire set.
         // Microtask timing is used to ensure that these overrides occur after the main template plugins run.

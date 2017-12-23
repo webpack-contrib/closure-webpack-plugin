@@ -1,5 +1,5 @@
 class HarmonyNoopTemplate {
-  apply() {} // eslint-disable-line class-methods-use-this
+  apply() {}
 }
 
 module.exports = HarmonyNoopTemplate;

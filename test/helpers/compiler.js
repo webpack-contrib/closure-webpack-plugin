@@ -59,4 +59,4 @@ export default function(fixture, config, options) {
       resolve(stats);
     })
   );
-};
+}

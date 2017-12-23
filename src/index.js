@@ -10,7 +10,7 @@ const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
 const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
 const GoogDependency = require('./goog-dependency');
 
-const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/ig;
+const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/gi;
 function toSafePath(originalPath) {
   return originalPath.replace(UNSAFE_PATH_CHARS, '$');
 }
@@ -20,11 +20,15 @@ class ClosureCompilerPlugin {
     this.options = options || {};
     this.compilerFlags = compilerFlags || {};
     if (typeof this.options.childCompilations === 'boolean') {
-      this.options.childCompilations = function childCompilationSupported(childrenSupported) {
+      this.options.childCompilations = function childCompilationSupported(
+        childrenSupported
+      ) {
         return childrenSupported;
       }.bind(this, this.options.childCompilations);
     } else if (typeof this.options.childCompilations !== 'function') {
-      this.options.childCompilations = function childCompilationSupported() { return false; };
+      this.options.childCompilations = function childCompilationSupported() {
+        return false;
+      };
     }
   }
 
@@ -32,7 +36,10 @@ class ClosureCompilerPlugin {
     this.requestShortener = new RequestShortener(compiler.context);
 
     compiler.plugin('compilation', (compilation, params) => {
-      if (compilation.compiler.parentCompilation && !this.options.childCompilations(compilation)) {
+      if (
+        compilation.compiler.parentCompilation &&
+        !this.options.childCompilations(compilation)
+      ) {
         return;
       }
 
@@ -43,7 +50,10 @@ class ClosureCompilerPlugin {
           compilation.dependencyTemplates.forEach((val, key) => {
             switch (key.name) {
               case 'AMDDefineDependency':
-                compilation.dependencyTemplates.set(key, new AMDDefineDependencyTemplate());
+                compilation.dependencyTemplates.set(
+                  key,
+                  new AMDDefineDependencyTemplate()
+                );
                 break;
 
               case 'HarmonyCompatibilityDependency':
@@ -51,20 +61,32 @@ class ClosureCompilerPlugin {
               case 'HarmonyExportHeaderDependency':
               case 'HarmonyExportImportedSpecifierDependency':
               case 'HarmonyExportSpecifierDependency':
-                compilation.dependencyTemplates.set(key, new HarmonyNoopTemplate());
+                compilation.dependencyTemplates.set(
+                  key,
+                  new HarmonyNoopTemplate()
+                );
                 break;
 
               case 'HarmonyImportDependency':
-                compilation.dependencyTemplates.set(key, new HarmonyImportDependencyTemplate());
+                compilation.dependencyTemplates.set(
+                  key,
+                  new HarmonyImportDependencyTemplate()
+                );
                 break;
 
               case 'HarmonyImportSpecifierDependency':
-                compilation.dependencyTemplates.set(key, new HarmonyImportSpecifierDependencyTemplate());
+                compilation.dependencyTemplates.set(
+                  key,
+                  new HarmonyImportSpecifierDependencyTemplate()
+                );
                 break;
 
               case 'ImportDependency':
                 if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
-                  compilation.dependencyTemplates.set(key, new ImportDependencyTemplate());
+                  compilation.dependencyTemplates.set(
+                    key,
+                    new ImportDependencyTemplate()
+                  );
                 }
                 break;
 
@@ -74,10 +96,12 @@ class ClosureCompilerPlugin {
           });
         });
       } else if (this.options.mode && this.options.mode !== 'STANDARD' && this.options.mode !== 'NONE') {
-        this.reportErrors(compilation, [{
-          level: 'warn',
-          description: 'invalid plugin mode',
-        }]);
+        this.reportErrors(compilation, [
+          {
+            level: 'warn',
+            description: 'invalid plugin mode',
+          },
+        ]);
       }
 
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) => {
@@ -113,7 +137,14 @@ class ClosureCompilerPlugin {
       const moduleDefs = [];
       const sources = [];
       uniqueId += this.addChunksToCompilation(
-        compilation, chunk, sources, chunkFlatMap, null, moduleDefs, uniqueId);
+        compilation,
+        chunk,
+        sources,
+        chunkFlatMap,
+        null,
+        moduleDefs,
+        uniqueId
+      );
 
       const compilationOptions = Object.assign(
         {},
@@ -121,7 +152,8 @@ class ClosureCompilerPlugin {
         this.compilerFlags,
         {
           module: moduleDefs,
-        });
+        }
+      );
 
       let externs = [];
 
@@ -135,9 +167,9 @@ class ClosureCompilerPlugin {
 
       compilationOptions.externs = externs;
 
-      compilationChain = compilationChain
-        .then(() => this.runCompiler(compilation, compilationOptions, sources)
-          .then((outputFiles) => {
+      compilationChain = compilationChain.then(() =>
+        this.runCompiler(compilation, compilationOptions, sources).then(
+          (outputFiles) => {
             outputFiles.forEach((outputFile) => {
               const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
               if (!chunkIdParts) {
@@ -145,7 +177,8 @@ class ClosureCompilerPlugin {
               }
               const chunkId = parseInt(chunkIdParts[1], 10);
               const matchingChunk = compilation.chunks.find(
-                chunk_ => chunk_.id === chunkId);
+                (chunk_) => chunk_.id === chunkId
+              );
               if (!matchingChunk) {
                 return;
               }
@@ -153,10 +186,17 @@ class ClosureCompilerPlugin {
               const sourceMap = JSON.parse(outputFile.source_map);
               sourceMap.file = assetName;
               const source = outputFile.src;
-              compilation.assets[assetName] = // eslint-disable-line no-param-reassign
-                new SourceMapSource(source, assetName, sourceMap, null, null);
+              compilation.assets[assetName] = new SourceMapSource(
+                source,
+                assetName,
+                sourceMap,
+                null,
+                null
+              );
             });
-          }));
+          }
+        )
+      );
     });
 
     compilationChain.then(() => cb()).catch(() => cb());
@@ -178,7 +218,8 @@ class ClosureCompilerPlugin {
       {
         path: basicRuntimePath,
         src: fs.readFileSync(basicRuntimePath, 'utf8'),
-      }];
+      },
+    ];
 
     let baseModuleCount = allSources.length;
 
@@ -204,7 +245,14 @@ class ClosureCompilerPlugin {
       }
       if (chunk.parents.length === 0) {
         uniqueId += this.addChunksToCompilation(
-          compilation, chunk, allSources, chunkFlatMap, BASE_MODULE_NAME, moduleDefs, uniqueId);
+          compilation,
+          chunk,
+          allSources,
+          chunkFlatMap,
+          BASE_MODULE_NAME,
+          moduleDefs,
+          uniqueId
+        );
       }
 
       // The jsonp runtime must be injected if at least one module
@@ -239,7 +287,11 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     }
 
     if (jsonpRuntimeRequired) {
-      allSources.splice(2, 0, ClosureCompilerPlugin.renderRuntime(compilation, chunkMap));
+      allSources.splice(
+        2,
+        0,
+        ClosureCompilerPlugin.renderRuntime(compilation, chunkMap)
+      );
       baseModuleCount += 1;
       moduleDefs[0] = `${BASE_MODULE_NAME}:${baseModuleCount}`;
     }
@@ -252,40 +304,52 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         defines.push(...this.compilerFlags.define);
       }
     }
-    defines.push(`_WEBPACK_TIMEOUT_=${compilation.outputOptions.chunkLoadTimeout}`);
+    defines.push(
+      `_WEBPACK_TIMEOUT_=${compilation.outputOptions.chunkLoadTimeout}`
+    );
 
-    const PUBLIC_PATH = compilation.mainTemplate.getPublicPath({ hash: compilation.hash });
+    const PUBLIC_PATH = compilation.mainTemplate.getPublicPath({
+      hash: compilation.hash,
+    });
     defines.push(`_WEBPACK_PUBLIC_PATH_='${PUBLIC_PATH}'`);
 
-    const filteredEntryPoints = Array.from(entryPoints)
-      .filter(entryPoint => allSources.find(source => source.path === entryPoint));
-    filteredEntryPoints.unshift(...allSources.slice(1, baseModuleCount).map(entry => entry.path));
+    const filteredEntryPoints = Array.from(entryPoints).filter((entryPoint) =>
+      allSources.find((source) => source.path === entryPoint)
+    );
+    filteredEntryPoints.unshift(
+      ...allSources.slice(1, baseModuleCount).map((entry) => entry.path)
+    );
 
-    const entryChunkWrapper = 'var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);';
-    const moduleWrappers = moduleDefs.map((moduleDef) => {
-      if (/^required-base:/.test(moduleDef)) {
-        return `required-base:${entryChunkWrapper}`;
-      }
-      const defParts = moduleDef.split(':');
-      const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
-      let parentChunk = null;
-      if (chunkIdParts) {
-        const chunkId = parseInt(chunkIdParts[1], 10);
-        chunkFlatMap.forEach((parent, chunk) => {
-          if (chunk && chunk.id === chunkId) {
-            parentChunk = parent;
-          }
-        });
-      }
+    const entryChunkWrapper =
+      'var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);';
+    const moduleWrappers = moduleDefs
+      .map((moduleDef) => {
+        if (/^required-base:/.test(moduleDef)) {
+          return `required-base:${entryChunkWrapper}`;
+        }
+        const defParts = moduleDef.split(':');
+        const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
+        let parentChunk = null;
+        if (chunkIdParts) {
+          const chunkId = parseInt(chunkIdParts[1], 10);
+          chunkFlatMap.forEach((parent, chunk) => {
+            if (chunk && chunk.id === chunkId) {
+              parentChunk = parent;
+            }
+          });
+        }
 
-      if (parentChunk !== null) {
-        return `${defParts[0]}:webpackJsonp([${chunkIdParts[1]}], function(__wpcc){%s});`;
-      } else if (chunkIdParts) {
-        return `${defParts[0]}:${entryChunkWrapper}`;
-      }
+        if (parentChunk !== null) {
+          return `${defParts[0]}:webpackJsonp([${
+            chunkIdParts[1]
+          }], function(__wpcc){%s});`;
+        } else if (chunkIdParts) {
+          return `${defParts[0]}:${entryChunkWrapper}`;
+        }
 
-      return null;
-    }).filter(wrapper => wrapper !== null);
+        return null;
+      })
+      .filter((wrapper) => wrapper !== null);
 
     const compilationOptions = Object.assign(
       {},
@@ -296,7 +360,8 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         module: moduleDefs,
         define: defines,
         module_wrapper: moduleWrappers,
-      });
+      }
+    );
 
     /**
      * Invoke the compiler and return a promise of the results.
@@ -305,7 +370,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
      */
     this.runCompiler(compilation, compilationOptions, allSources)
       .then((outputFiles) => {
-        const baseFile = outputFiles.find(file => /required-base/.test(file.path));
+        const baseFile = outputFiles.find((file) =>
+          /required-base/.test(file.path)
+        );
         let baseSrc = `${baseFile.src}\n`;
         if (/^['"]use strict['"];\s*$/.test(baseFile.src)) {
           baseSrc = '';
@@ -317,7 +384,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
             return;
           }
           const chunkId = parseInt(chunkIdParts[1], 10);
-          const chunk = compilation.chunks.find(chunk_ => chunk_.id === chunkId);
+          const chunk = compilation.chunks.find(
+            (chunk_) => chunk_.id === chunkId
+          );
           if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
             return;
           }
@@ -325,11 +394,17 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           const sourceMap = JSON.parse(outputFile.source_map);
           sourceMap.file = assetName;
           const source = outputFile.src;
-          let newSource = new SourceMapSource(source, assetName, sourceMap, null, null);
+          let newSource = new SourceMapSource(
+            source,
+            assetName,
+            sourceMap,
+            null,
+            null
+          );
           if (chunk.hasRuntime()) {
             newSource = new ConcatSource(baseSrc, newSource);
           }
-          compilation.assets[assetName] = newSource; // eslint-disable-line no-param-reassign
+          compilation.assets[assetName] = newSource;
         });
 
         cb();
@@ -354,11 +429,14 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       });
 
       compilerProcess.on('error', (err) => {
-        this.reportErrors(compilation, [{
-          level: 'error',
-          description: `Closure-compiler. Could not be launched. Is java in the path?\n${
-            compilerRunner.prependFullCommand(err.message)}`,
-        }]);
+        this.reportErrors(compilation, [
+          {
+            level: 'error',
+            description: `Closure-compiler. Could not be launched. Is java in the path?\n${compilerRunner.prependFullCommand(
+              err.message
+            )}`,
+          },
+        ]);
         reject();
       });
 
@@ -380,13 +458,14 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
             const exceptionIndex = stdErrData.indexOf(']java.lang.');
             if (exceptionIndex > 0) {
               try {
-                errors = JSON.parse(stdErrData.substring(0, exceptionIndex + 1));
+                errors = JSON.parse(
+                  stdErrData.substring(0, exceptionIndex + 1)
+                );
                 errors.push({
                   level: 'error',
                   description: stdErrData.substr(exceptionIndex + 1),
                 });
-              } catch (e2) { // eslint-disable-line no-empty
-              }
+              } catch (e2) {}
             }
           }
 
@@ -417,12 +496,20 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     });
   }
 
-  addChunksToCompilation(compilation, chunk, sources, chunkMap, baseModule, moduleDefs, nextUniqueId) {
+  addChunksToCompilation(
+    compilation,
+    chunk,
+    sources,
+    chunkMap,
+    baseModule,
+    moduleDefs,
+    nextUniqueId
+  ) {
     let chunkSources;
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       chunkSources = ClosureCompilerPlugin.getChunkSources(chunk, () => {
         const newId = nextUniqueId;
-        nextUniqueId += 1; // eslint-disable-line no-param-reassign
+        nextUniqueId += 1;
         return newId;
       });
     } else {
@@ -435,12 +522,14 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         if (souceAndMap.map) {
           sourceMap = JSON.stringify(souceAndMap.map);
         }
-      } catch (e) { } // eslint-disable-line no-empty
-      chunkSources = [{
-        path: chunkName,
-        src,
-        sourceMap,
-      }];
+      } catch (e) {}
+      chunkSources = [
+        {
+          path: chunkName,
+          src,
+          sourceMap,
+        },
+      ];
     }
 
     sources.push(...chunkSources);
@@ -453,8 +542,15 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
     chunkMap.forEach((parentChunk, childChunk) => {
       if (parentChunk === chunk) {
-        nextUniqueId += this.addChunksToCompilation( // eslint-disable-line no-param-reassign
-          compilation, childChunk, sources, chunkMap, chunkName, moduleDefs, nextUniqueId);
+        nextUniqueId += this.addChunksToCompilation(
+          compilation,
+          childChunk,
+          sources,
+          chunkMap,
+          chunkName,
+          moduleDefs,
+          nextUniqueId
+        );
       }
     });
 
@@ -490,11 +586,16 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
             childrenOfAsyncChunkMap.set(childChunk, grandchildrenChunkMap);
           }
         });
-        if (extraAsyncChunkMap && childrenOfAsyncChunkMap.size !== childChunksMap.size) {
-          childrenOfAsyncChunkMap.forEach((grandchildrenChunkMap, childChunk) => {
-            childChunksMap.delete(childChunk);
-            extraAsyncChunkMap.set(childChunk, grandchildrenChunkMap);
-          });
+        if (
+          extraAsyncChunkMap &&
+          childrenOfAsyncChunkMap.size !== childChunksMap.size
+        ) {
+          childrenOfAsyncChunkMap.forEach(
+            (grandchildrenChunkMap, childChunk) => {
+              childChunksMap.delete(childChunk);
+              extraAsyncChunkMap.set(childChunk, grandchildrenChunkMap);
+            }
+          );
         }
 
         chunkMap.set(chunk, childChunksMap);
@@ -518,12 +619,15 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
   static getChunkSources(chunk, getUniqueId) {
     if (chunk.isEmpty()) {
-      return [{
-        path: `__empty_${getUniqueId()}__`,
-        src: '',
-      }];
+      return [
+        {
+          path: `__empty_${getUniqueId()}__`,
+          src: '',
+        },
+      ];
     }
-    return chunk.getModules()
+    return chunk
+      .getModules()
       .map((webpackModule) => {
         let path = webpackModule.userRequest;
         if (!path) {
@@ -537,7 +641,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           if (souceAndMap.map) {
             sourceMap = JSON.stringify(souceAndMap.map);
           }
-        } catch (e) { } // eslint-disable-line no-empty
+        } catch (e) {}
 
         return {
           path: toSafePath(path),
@@ -546,9 +650,14 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           webpackId: webpackModule.id,
         };
       })
-      .filter(moduleJson => !(moduleJson.path === '__unknown__' && moduleJson.src === '/* (ignored) */'));
+      .filter(
+        (moduleJson) =>
+          !(
+            moduleJson.path === '__unknown__' &&
+            moduleJson.src === '/* (ignored) */'
+          )
+      );
   }
-
 
   /**
    * Given the source path of the output destination, return the custom
@@ -561,38 +670,64 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
   static renderRuntime(compilation, chunks) {
     const srcPathPerChunk = [];
     function setChunkPaths(parentChunk, childChunksMap, chunkMaps) {
-      const scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall('asset-path',
-        JSON.stringify(compilation.outputOptions.chunkFilename), {
-          hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(compilation.hash)} + "`,
-          hashWithLength: length => `" + ${compilation.mainTemplate.renderCurrentHashCode(compilation.hash, length)} + "`,
+      const scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall(
+        'asset-path',
+        JSON.stringify(compilation.outputOptions.chunkFilename),
+        {
+          hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(
+            compilation.hash
+          )} + "`,
+          hashWithLength: (length) =>
+            `" + ${compilation.mainTemplate.renderCurrentHashCode(
+              compilation.hash,
+              length
+            )} + "`,
           chunk: {
             id: `${parentChunk.id}`,
             hash: chunkMaps[parentChunk.id] || parentChunk.hash,
             hashWithLength(length) {
               const shortChunkHashMap = Object.create(null);
               Object.keys(chunkMaps.hash).forEach((chunkId) => {
-                if (typeof chunkMaps.hash[chunkId] === 'string') { shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(0, length); }
+                if (typeof chunkMaps.hash[chunkId] === 'string') {
+                  shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(
+                    0,
+                    length
+                  );
+                }
               });
-              return shortChunkHashMap[parentChunk.id] || parentChunk.hash.substr(0, length);
+              return (
+                shortChunkHashMap[parentChunk.id] ||
+                parentChunk.hash.substr(0, length)
+              );
             },
             name: parentChunk.name || parentChunk.id,
           },
-        });
-      srcPathPerChunk.push(`_WEBPACK_SOURCE_[${parentChunk.id}] = ${scriptSrcPath}`);
+        }
+      );
+      srcPathPerChunk.push(
+        `_WEBPACK_SOURCE_[${parentChunk.id}] = ${scriptSrcPath}`
+      );
       childChunksMap.forEach((grandchildrenChunksMap, childChunk) => {
         setChunkPaths(childChunk, grandchildrenChunksMap, chunkMaps);
       });
     }
     chunks.forEach((childChunksMap, entryChunk) => {
       childChunksMap.forEach((grandchildChunksMap, childChunk) => {
-        setChunkPaths(childChunk, grandchildChunksMap, entryChunk.getChunkMaps());
+        setChunkPaths(
+          childChunk,
+          grandchildChunksMap,
+          entryChunk.getChunkMaps()
+        );
       });
     });
 
     const lateLoadedRuntimePath = require.resolve('./runtime.js');
     return {
       path: lateLoadedRuntimePath,
-      src: `${fs.readFileSync(lateLoadedRuntimePath, 'utf8')}\n${srcPathPerChunk.join('\n')}`,
+      src: `${fs.readFileSync(
+        lateLoadedRuntimePath,
+        'utf8'
+      )}\n${srcPathPerChunk.join('\n')}`,
     };
   }
 
@@ -608,11 +743,20 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           formattedMsg += `:${error.line}`;
         }
         if (error.originalLocation) {
-          const originalSource = error.originalLocation.source === error.source ? 'line ' : // eslint-disable-line multiline-ternary
-            `${this.requestShortener.shorten(error.originalLocation.source)}:`;
+          const originalSource =
+            error.originalLocation.source === error.source
+              ? 'line '
+              : `${this.requestShortener.shorten(
+                  error.originalLocation.source
+                )}:`;
 
-          if (error.originalLocation.source !== error.source || error.originalLocation.line !== error.line) {
-            formattedMsg += ` (originally at ${originalSource}${error.originalLocation.line})`;
+          if (
+            error.originalLocation.source !== error.source ||
+            error.originalLocation.line !== error.line
+          ) {
+            formattedMsg += ` (originally at ${originalSource}${
+              error.originalLocation.line
+            })`;
           }
         }
         formattedMsg += ` from closure-compiler: ${error.description}`;

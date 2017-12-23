@@ -33,7 +33,6 @@ function makeImportStatement(declare, dep, outputOptions, requestShortener) {
 
 class HarmonyImportDependencyTemplate {
   apply(dep, source, outputOptions, requestShortener) {
-    // eslint-disable-line  class-methods-use-this
     const content = makeImportStatement(
       true,
       dep,

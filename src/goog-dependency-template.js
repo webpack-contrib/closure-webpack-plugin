@@ -1,5 +1,5 @@
 class GoogDependencyTemplate {
-  apply(dep, source) { // eslint-disable-line class-methods-use-this
+  apply(dep, source) {
     if (dep.insertPosition === null) {
       return;
     }

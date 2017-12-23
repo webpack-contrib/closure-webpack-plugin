@@ -95,7 +95,11 @@ class ClosureCompilerPlugin {
             }
           });
         });
-      } else if (this.options.mode && this.options.mode !== 'STANDARD' && this.options.mode !== 'NONE') {
+      } else if (
+        this.options.mode &&
+        this.options.mode !== 'STANDARD' &&
+        this.options.mode !== 'NONE'
+      ) {
         this.reportErrors(compilation, [
           {
             level: 'warn',
@@ -114,13 +118,22 @@ class ClosureCompilerPlugin {
         }
       });
 
-      if (this.options.closureLibraryBase && (this.options.deps || this.options.extraDeps)) {
+      if (
+        this.options.closureLibraryBase &&
+        (this.options.deps || this.options.extraDeps)
+      ) {
         const { normalModuleFactory } = params;
         normalModuleFactory.plugin('parser', (parser) => {
           parser.apply(new GoogRequireParserPlugin(this.options));
         });
-        compilation.dependencyFactories.set(GoogDependency, params.normalModuleFactory);
-        compilation.dependencyTemplates.set(GoogDependency, new GoogDependency.Template());
+        compilation.dependencyFactories.set(
+          GoogDependency,
+          params.normalModuleFactory
+        );
+        compilation.dependencyTemplates.set(
+          GoogDependency,
+          new GoogDependency.Template()
+        );
       }
     });
   }

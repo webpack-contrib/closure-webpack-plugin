@@ -3,8 +3,7 @@ const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependenc
 class AMDDefineDependencyTemplate extends AMDDefineDependency.Template {
   get definitions() {
     const defs = super.definitions;
-    // eslint-disable-next-line prefer-const
-    for (let value in defs) {
+    for (const value in defs) {
       if (Object.prototype.hasOwnProperty.call(defs, value)) {
         const valueEntries = defs[value];
         defs[value].forEach((line, index) => {

@@ -7,7 +7,7 @@ class GoogDependency extends ModuleDependency {
     this.insertPosition = insertPosition;
   }
 
-  get type() { // eslint-disable-line class-methods-use-this
+  get type() {
     return 'goog.require or goog.module.get';
   }
 }

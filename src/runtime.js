@@ -1,7 +1,4 @@
 /* eslint-env browser */
-/* eslint no-underscore-dangle: "off", camelcase: "off", no-var: "off", prefer-destructuring: "off",
-     no-multi-assign: "off", dot-notation: "off", prefer-arrow-callback: "off", vars-on-top: "off",
-     prefer-template: "off", no-unused-vars: "off", func-names: "off" */
 /* global __wpcc, _WEBPACK_SOURCE_, __webpack_require__, _WEBPACK_TIMEOUT_ */
 
 /**
@@ -22,14 +19,14 @@ if (typeof _WEBPACK_MODULE_CACHE_ === 'undefined') {
 }
 
 // install a JSONP callback for chunk loading
-(function () {
+(function() {
   /** @type {undefined|function(!Array<number>, function(Object))} */
   var parentJsonpFunction = window['webpackJsonp'];
   /**
    * @param {!Array<number>} chunkIds
    * @param {function(Object)} cb
    */
-  window['webpackJsonp'] = function (chunkIds, cb) {
+  window['webpackJsonp'] = function(chunkIds, cb) {
     var i;
     var resolves = [];
 
@@ -41,15 +38,15 @@ if (typeof _WEBPACK_MODULE_CACHE_ === 'undefined') {
       }
     }
     if (parentJsonpFunction) {
-      parentJsonpFunction(chunkIds, function () {});
+      parentJsonpFunction(chunkIds, function() {});
     }
     var executionCallback = cb;
     while (resolves.length) {
       resolves.shift()(cb);
-      executionCallback = undefined; // eslint-disable-line no-undefined
+      executionCallback = undefined;
     }
   };
-}());
+})();
 
 /**
  * @param {number} chunkId
@@ -69,10 +66,10 @@ function _webpack_load_chunk_(chunkId, basePromise) {
   }
 
   // setup Promise in chunk cache
-  var promise = new Promise(function (resolve, reject) {
+  var promise = new Promise(function(resolve, reject) {
     installedChunkData = _WEBPACK_MODULE_CACHE_[chunkId] = [resolve, reject];
-  }).then(function (cb) {
-    return basePromise.then(function () {
+  }).then(function(cb) {
+    return basePromise.then(function() {
       if (cb) {
         cb.call(_WEBPACK_GLOBAL_THIS_, __wpcc);
       }
@@ -103,7 +100,7 @@ function _webpack_load_chunk_(chunkId, basePromise) {
       if (chunk) {
         chunk[1](new Error('Loading chunk ' + chunkId + ' failed.'));
       }
-      _WEBPACK_MODULE_CACHE_[chunkId] = undefined; // eslint-disable-line no-undefined
+      _WEBPACK_MODULE_CACHE_[chunkId] = undefined;
     }
   }
   head.appendChild(script);
@@ -115,8 +112,8 @@ function _webpack_load_chunk_(chunkId, basePromise) {
  *
  * @type {function(...number):!Promise}
  */
-__webpack_require__.e = function () {
-  var chunkIds = Array.prototype.slice.call(arguments); // eslint-disable-line prefer-rest-params
+__webpack_require__.e = function() {
+  var chunkIds = Array.prototype.slice.call(arguments);
 
   var promise = Promise.resolve();
   for (var i = 0; i < chunkIds.length; i++) {
@@ -129,4 +126,7 @@ __webpack_require__.e = function () {
  * on error function for async loading
  * @param {Error} err
  */
-__webpack_require__.oe = function (err) { console.error(err); throw err; }; // eslint-disable-line no-console
+__webpack_require__.oe = function(err) {
+  console.error(err);
+  throw err;
+};

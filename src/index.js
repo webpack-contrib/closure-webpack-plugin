@@ -7,6 +7,8 @@ const HarmonyImportSpecifierDependencyTemplate = require('./harmony-import-speci
 const HarmonyNoopTemplate = require('./harmony-noop-template');
 const ImportDependencyTemplate = require('./import-dependency-template');
 const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
+const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
+const GoogDependency = require('./goog-dependency');
 
 const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/ig;
 function toSafePath(originalPath) {
@@ -29,7 +31,7 @@ class ClosureCompilerPlugin {
   apply(compiler) {
     this.requestShortener = new RequestShortener(compiler.context);
 
-    compiler.plugin('compilation', (compilation) => {
+    compiler.plugin('compilation', (compilation, params) => {
       if (compilation.compiler.parentCompilation && !this.options.childCompilations(compilation)) {
         return;
       }
@@ -71,7 +73,7 @@ class ClosureCompilerPlugin {
             }
           });
         });
-      } else if (this.options.mode && this.options.mode !== 'STANDARD') {
+      } else if (this.options.mode && this.options.mode !== 'STANDARD' && this.options.mode !== 'NONE') {
         this.reportErrors(compilation, [{
           level: 'warn',
           description: 'invalid plugin mode',
@@ -81,10 +83,21 @@ class ClosureCompilerPlugin {
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) => {
         if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
           this.aggressiveBundle(compilation, originalChunks, cb);
+        } else if (this.options.mode === 'NONE') {
+          cb();
         } else {
           this.standardBundle(compilation, originalChunks, cb);
         }
       });
+
+      if (this.options.closureLibraryBase && (this.options.deps || this.options.extraDeps)) {
+        const { normalModuleFactory } = params;
+        normalModuleFactory.plugin('parser', (parser) => {
+          parser.apply(new GoogRequireParserPlugin(this.options));
+        });
+        compilation.dependencyFactories.set(GoogDependency, params.normalModuleFactory);
+        compilation.dependencyTemplates.set(GoogDependency, new GoogDependency.Template());
+      }
     });
   }
 

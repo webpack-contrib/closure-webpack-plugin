@@ -3,94 +3,88 @@ unit_tests: &unit_tests
     - checkout
     - setup_remote_docker
     - restore_cache:
-        key: dependency-cache-{{ checksum "package.json" }}
+        key: dependency-cache-{{ checksum "package-lock.json" }}
     - run:
         name: NPM Rebuild
-        command: npm rebuild
+        command: npm install
     - run:
         name: Run unit tests.
-        command: npm test
+        command: npm run ci:test
 canary_tests: &canary_tests
   steps:
     - checkout
     - setup_remote_docker
     - restore_cache:
-        key: dependency-cache-{{ checksum "package.json" }}
+        key: dependency-cache-{{ checksum "package-lock.json" }}
     - run:
         name: NPM Rebuild
-        command: npm rebuild
+        command: npm install
     - run:
         name: Install Webpack Canary
-        command: npm i --no-save git://github.com/webpack/webpack.git#master
+        command: npm i --no-save webpack@next
     - run:
         name: Run unit tests.
-        command: npm test
+        command: npm run ci:test
 
 version: 2
 jobs:
   dependency_cache:
-    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-node-base:latest
     steps:
       - checkout
       - setup_remote_docker
       - restore_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
           name: Install Dependencies
           command: npm install
       - save_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: dependency-cache-{{ checksum "package-lock.json" }}
           paths:
             - ./node_modules
 
-  node8_webpack_latest:
-    working_directory: ~/closure-webpack-plugin
+  node8-latest:
     docker:
       - image: webpackcontrib/circleci-jdk9-node8:latest
     steps:
       - checkout
       - setup_remote_docker
       - restore_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
           name: NPM Rebuild
-          command: npm rebuild
+          command: npm install
       - run:
           name: Run unit tests.
-          command: npm test
+          command: npm run ci:coverage
       - run:
           name: Submit coverage data to codecov.
           command: bash <(curl -s https://codecov.io/bash)
-          when: always
-  node6_webpack_latest:
-    working_directory: ~/closure-webpack-plugin
+          when: on_success
+  node6-latest:
     docker:
       - image: webpackcontrib/circleci-jdk9-node6:latest
     <<: *unit_tests
-  node9_webpack_latest:
-    working_directory: ~/closure-webpack-plugin
+  node9-latest:
     docker:
       - image: webpackcontrib/circleci-jdk9-node9:latest
     <<: *unit_tests
-  node8_webpack_canary:
-    working_directory: ~/closure-webpack-plugin
+  node8-canary:
     docker:
       - image: webpackcontrib/circleci-jdk9-node8:latest
     <<: *canary_tests
   analysis:
-    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-node-base:latest
     steps:
       - checkout
       - setup_remote_docker
       - restore_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
           name: NPM Rebuild
-          command: npm rebuild
+          command: npm install
       - run:
           name: Run linting.
           command: npm run lint
@@ -99,25 +93,24 @@ jobs:
           command: npm run security
       - run:
           name: Validate Commit Messages
-          command: npm run lint:commits
+          command: npm run ci:lint:commits
   publish:
-    working_directory: ~/closure-webpack-plugin
     docker:
       - image: webpackcontrib/circleci-node-base:latest
     steps:
       - checkout
       - setup_remote_docker
       - restore_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
           name: NPM Rebuild
-          command: npm rebuild
+          command: npm install
       - run:
           name: Validate Commit Messages
           command: npm run release:validate
       - run:
           name: Publish to NPM
-          command: printf "Pretend running conventional-github-releaser"
+          command: printf "noop running conventional-github-releaser"
 
 version: 2.0
 workflows:
@@ -125,25 +118,7 @@ workflows:
   validate-publish:
     jobs:
       - dependency_cache
-      - node6_webpack_latest:
-          requires:
-            - dependency_cache
-          filters:
-            tags:
-              only: /.*/
-      - node8_webpack_latest:
-          requires:
-            - dependency_cache
-          filters:
-            tags:
-              only: /.*/
-      - node9_webpack_latest:
-          requires:
-            - dependency_cache
-          filters:
-            tags:
-              only: /.*/
-      - node8_webpack_canary:
+      - node6-latest:
           requires:
             - dependency_cache
           filters:
@@ -151,18 +126,35 @@ workflows:
               only: /.*/
       - analysis:
           requires:
-            - node6_webpack_latest
-            - node8_webpack_latest
-            - node9_webpack_latest
+            - dependency_cache
+          filters:
+            tags:
+              only: /.*/
+      - node8-latest:
+          requires:
+            - analysis
+            - node6-latest
+          filters:
+            tags:
+              only: /.*/
+      - node9-latest:
+          requires:
+            - analysis
+            - node6-latest
+          filters:
+            tags:
+              only: /.*/
+      - node8-canary:
+          requires:
+            - analysis
+            - node6-latest
           filters:
             tags:
               only: /.*/
       - publish:
           requires:
-            - node6_webpack_latest
-            - node8_webpack_latest
-            - node9_webpack_latest
-            - analysis
+            - node8-latest
+            - node9-latest
           filters:
             branches:
               only:

@@ -1,33 +1,62 @@
 import path from 'path';
+import del from 'del';
 import webpack from 'webpack';
 import MemoryFS from 'memory-fs';
 
-export default function (fixture, testConfig, testOptions = { emit: false }) {
-  const config = {
-    devtool: testConfig.devtool || 'sourcemap',
+const majorVersion = require('webpack/package.json').version.split('.')[0];
+
+const modules = (config) => {
+  return {
+    rules: config.rules,
+  };
+};
+
+const plugins = (config) =>
+  [
+    new webpack.optimize.CommonsChunkPlugin({
+      names: ['runtime'],
+      minChunks: Infinity,
+    }),
+  ].concat(config.plugins || []);
+
+const output = (config) => {
+  return {
+    path: path.resolve(
+      __dirname,
+      `../outputs/${config.output ? config.output : ''}`
+    ),
+    filename: '[name].js',
+    chunkFilename: '[name].chunk.js',
+  };
+};
+
+export default function(fixture, config, options) {
+  config = {
+    devtool: config.devtool || 'sourcemap',
     context: path.resolve(__dirname, '..', 'fixtures'),
-    entry: `./${path.basename(fixture)}/index.js`,
-    output: {
-      path: path.resolve(
-        __dirname,
-        `../results/${testConfig.path ? testConfig.path : ''}`,
-      ),
-      filename: '[name].bundle.js',
-    },
-    plugins: [].concat(testConfig.plugins || []),
+    entry: `./${fixture}`,
+    output: output(config),
+    module: modules(config),
+    plugins: plugins(config),
   };
 
-  const options = Object.assign({}, testOptions);
+  if (Number(majorVersion) >= 4) {
+    config.mode = 'development';
+  }
+
+  options = Object.assign({ output: false }, options);
+
+  if (options.output) del.sync(config.output.path);
 
   const compiler = webpack(config);
 
-  if (!options.emit) compiler.outputFileSystem = new MemoryFS();
-  // eslint-disable-next-line
-  return new Promise((resolve, reject) => {
-    return compiler.run((err, stats) => {
+  if (!options.output) compiler.outputFileSystem = new MemoryFS();
+
+  return new Promise((resolve, reject) =>
+    compiler.run((err, stats) => {
       if (err) reject(err);
 
       resolve(stats);
-    });
-  });
-}
+    })
+  );
+};

@@ -89,6 +89,12 @@ class GoogRequireParserPlugin {
         try {
           const param = expr.arguments[0].value;
           const modulePath = this.googPathsByNamespace.get(param);
+          if (!modulePath) {
+            parser.state.compilation.warnings.push(
+              new Error(`Unable to locate module for namespace: ${param}`)
+            );
+            return false;
+          }
           const insertPosition =
             this.options.mode === 'NONE' ? expr.start : null;
           if (this.googDepsByPath.has(modulePath)) {

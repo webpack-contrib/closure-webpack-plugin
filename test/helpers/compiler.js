@@ -3,7 +3,7 @@ import del from 'del';
 import webpack from 'webpack';
 import MemoryFS from 'memory-fs';
 
-const majorVersion = require('webpack/package.json').version.split('.')[0];
+const [majorVersion] = require('webpack/package.json').version.split('.');
 
 const modules = (config) => {
   return {

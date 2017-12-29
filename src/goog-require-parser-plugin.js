@@ -58,7 +58,7 @@ class GoogRequireParserPlugin {
             ) {
               googDepsByPath.set(
                 filePath,
-                node.arguments[2].elements.map((node) => node.value)
+                node.arguments[2].elements.map((nodeVal) => nodeVal.value)
               );
             }
           }
@@ -109,7 +109,7 @@ class GoogRequireParserPlugin {
             new GoogDependency(modulePath, insertPosition)
           );
         } catch (e) {
-          console.error(e);
+          parser.state.compilation.errors.push(e);
         }
         return false;
       }
@@ -128,8 +128,9 @@ class GoogRequireParserPlugin {
           parser.state.current.contextArgument = function() {
             return 'window';
           };
-          const variableInjectionFunctionWrapperEndCode =
-            parser.state.current.variableInjectionFunctionWrapperEndCode;
+          const {
+            variableInjectionFunctionWrapperEndCode,
+          } = parser.state.current;
           parser.state.current.variableInjectionFunctionWrapperEndCode = function(
             varExpressions,
             block

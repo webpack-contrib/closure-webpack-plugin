@@ -36,10 +36,33 @@ class ClosureCompilerPlugin {
     this.requestShortener = new RequestShortener(compiler.context);
 
     compiler.plugin('compilation', (compilation, params) => {
-      if (
+      const runFullCompilation =
         compilation.compiler.parentCompilation &&
-        !this.options.childCompilations(compilation)
+        !this.options.childCompilations(compilation);
+
+      if (
+        this.options.closureLibraryBase &&
+        (this.options.deps || this.options.extraDeps)
       ) {
+        const parserPluginOptions = Object.assign({}, this.options, {
+          mode: runFullCompilation ? this.options.mode : 'NONE',
+        });
+
+        const { normalModuleFactory } = params;
+        normalModuleFactory.plugin('parser', (parser) => {
+          parser.apply(new GoogRequireParserPlugin(parserPluginOptions));
+        });
+        compilation.dependencyFactories.set(
+          GoogDependency,
+          params.normalModuleFactory
+        );
+        compilation.dependencyTemplates.set(
+          GoogDependency,
+          new GoogDependency.Template()
+        );
+      }
+
+      if (!runFullCompilation) {
         return;
       }
 

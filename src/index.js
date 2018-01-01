@@ -37,8 +37,8 @@ class ClosureCompilerPlugin {
 
     compiler.plugin('compilation', (compilation, params) => {
       const runFullCompilation =
-        compilation.compiler.parentCompilation &&
-        !this.options.childCompilations(compilation);
+        !compilation.compiler.parentCompilation ||
+        this.options.childCompilations(compilation);
 
       if (
         this.options.closureLibraryBase &&
@@ -140,24 +140,6 @@ class ClosureCompilerPlugin {
           this.standardBundle(compilation, originalChunks, cb);
         }
       });
-
-      if (
-        this.options.closureLibraryBase &&
-        (this.options.deps || this.options.extraDeps)
-      ) {
-        const { normalModuleFactory } = params;
-        normalModuleFactory.plugin('parser', (parser) => {
-          parser.apply(new GoogRequireParserPlugin(this.options));
-        });
-        compilation.dependencyFactories.set(
-          GoogDependency,
-          params.normalModuleFactory
-        );
-        compilation.dependencyTemplates.set(
-          GoogDependency,
-          new GoogDependency.Template()
-        );
-      }
     });
   }
 

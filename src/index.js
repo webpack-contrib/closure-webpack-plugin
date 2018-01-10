@@ -9,6 +9,8 @@ const ImportDependencyTemplate = require('./import-dependency-template');
 const AMDDefineDependencyTemplate = require('./amd-define-dependency-template');
 const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
 const GoogDependency = require('./goog-dependency');
+const GoogLoaderPrefixDependency = require('./goog-loader-prefix-dependency');
+const GoogLoaderSuffixDependency = require('./goog-loader-suffix-dependency');
 
 const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/gi;
 function toSafePath(originalPath) {
@@ -59,6 +61,22 @@ class ClosureCompilerPlugin {
         compilation.dependencyTemplates.set(
           GoogDependency,
           new GoogDependency.Template()
+        );
+        compilation.dependencyFactories.set(
+          GoogLoaderPrefixDependency,
+          params.normalModuleFactory
+        );
+        compilation.dependencyTemplates.set(
+          GoogLoaderPrefixDependency,
+          new GoogLoaderPrefixDependency.Template()
+        );
+        compilation.dependencyFactories.set(
+          GoogLoaderSuffixDependency,
+          params.normalModuleFactory
+        );
+        compilation.dependencyTemplates.set(
+          GoogLoaderSuffixDependency,
+          new GoogLoaderSuffixDependency.Template()
         );
       }
 

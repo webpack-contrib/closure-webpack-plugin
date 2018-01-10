@@ -3,6 +3,8 @@ const path = require('path');
 const acorn = require('acorn-dynamic-import').default;
 const walk = require('acorn/dist/walk');
 const GoogDependency = require('./goog-dependency');
+const GoogLoaderPrefixDependency = require('./goog-loader-prefix-dependency');
+const GoogLoaderSuffixDependency = require('./goog-loader-suffix-dependency');
 
 class GoogRequireParserPlugin {
   constructor(options) {
@@ -68,52 +70,49 @@ class GoogRequireParserPlugin {
   }
 
   apply(parser) {
-    parser.plugin(
-      ['call goog.require', 'call goog.module.get', 'call goog.provide'],
-      (expr) => {
+    parser.plugin(['call goog.require', 'call goog.provide'], (expr) => {
+      if (
+        !parser.state.current.hasDependencies(
+          (dep) => dep.request === this.basePath
+        )
+      ) {
+        const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
+        parser.state.current.addDependency(
+          new GoogDependency(this.basePath, baseInsertPos)
+        );
+      }
+
+      // For goog.provide calls, add loader code and exit
+      if (expr.callee.property.name === 'provide') {
         if (
-          !parser.state.current.hasDependencies(
-            (dep) => dep.request === this.basePath
+          this.options.mode === 'NONE' &&
+          !parser.state.current.dependencies.find(
+            (dep) => dep instanceof GoogLoaderPrefixDependency
           )
         ) {
-          const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
-          parser.state.current.addDependency(
-            new GoogDependency(this.basePath, baseInsertPos)
-          );
-        }
-
-        // For goog.provide calls, all that's needed is a dependency on base.js
-        if (expr.callee.property === 'provide') {
-          return false;
-        }
-        try {
-          const param = expr.arguments[0].value;
-          const modulePath = this.googPathsByNamespace.get(param);
-          if (!modulePath) {
-            parser.state.compilation.warnings.push(
-              new Error(`Unable to locate module for namespace: ${param}`)
-            );
-            return false;
-          }
-          const insertPosition =
-            this.options.mode === 'NONE' ? expr.start : null;
-          if (this.googDepsByPath.has(modulePath)) {
-            this.googDepsByPath.get(modulePath).forEach((dep) => {
-              const depPath = this.googPathsByNamespace.get(dep);
-              parser.state.current.addDependency(
-                new GoogDependency(depPath, insertPosition)
-              );
-            });
-          }
-          parser.state.current.addDependency(
-            new GoogDependency(modulePath, insertPosition)
-          );
-        } catch (e) {
-          parser.state.compilation.errors.push(e);
+          this.addLoaderDependency(parser, false);
         }
         return false;
       }
-    );
+
+      try {
+        const param = expr.arguments[0].value;
+        const modulePath = this.googPathsByNamespace.get(param);
+        if (!modulePath) {
+          parser.state.compilation.warnings.push(
+            new Error(`Unable to locate module for namespace: ${param}`)
+          );
+          return false;
+        }
+        const insertPosition = this.options.mode === 'NONE' ? 0 : null;
+        parser.state.current.addDependency(
+          new GoogDependency(modulePath, insertPosition)
+        );
+      } catch (e) {
+        parser.state.compilation.errors.push(e);
+      }
+      return false;
+    });
 
     // When closure-compiler is not bundling the output, shim base.js of closure-library
     if (this.options.mode === 'NONE') {
@@ -124,7 +123,11 @@ class GoogRequireParserPlugin {
           expr.declarations[0].id.name === 'goog' &&
           parser.state.current.userRequest === this.basePath
         ) {
-          parser.state.current.addVariable('goog', 'window.goog', []);
+          parser.state.current.addVariable(
+            'goog',
+            'window.goog = window.goog || {}',
+            []
+          );
           parser.state.current.contextArgument = function() {
             return 'window';
           };
@@ -140,11 +143,37 @@ class GoogRequireParserPlugin {
               varExpressions,
               block
             );
-            return `window.goog = goog;${wrapperEndCode}`;
+            return `goog.ENABLE_DEBUG_LOADER = false; window.goog = goog;${wrapperEndCode}`;
           };
         }
       });
+      parser.plugin('call goog.module', (expr) => {
+        if (this.options.mode === 'NONE') {
+          const prefixDep = parser.state.current.dependencies.find(
+            (dep) => dep instanceof GoogLoaderPrefixDependency
+          );
+          const suffixDep = parser.state.current.dependencies.find(
+            (dep) => dep instanceof GoogLoaderSuffixDependency
+          );
+          if (prefixDep && suffixDep) {
+            prefixDep.isGoogModule = true;
+            suffixDep.isGoogModule = true;
+          } else {
+            this.addLoaderDependency(parser, true);
+          }
+        }
+      });
     }
+  }
+
+  addLoaderDependency(parser, isModule) {
+    parser.state.current.addDependency(
+      new GoogLoaderPrefixDependency(this.basePath, isModule, 0)
+    );
+    const sourceLength = parser.state.current._source.source().length;
+    parser.state.current.addDependency(
+      new GoogLoaderSuffixDependency(this.basePath, isModule, sourceLength)
+    );
   }
 }
 

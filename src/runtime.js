@@ -88,7 +88,7 @@ function _webpack_load_chunk_(chunkId, basePromise) {
   if (__wpcc.nc && __wpcc.nc.length > 0) {
     script.setAttribute('nonce', __wpcc.nc);
   }
-  script.src = _WEBPACK_SOURCE_[chunkId];
+  script.src = (__webpack_require__.p || '') + _WEBPACK_SOURCE_[chunkId];
   var timeout = setTimeout(onScriptComplete, _WEBPACK_TIMEOUT_);
   script.onerror = script.onload = onScriptComplete;
   function onScriptComplete() {

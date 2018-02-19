@@ -149,6 +149,17 @@ class GoogRequireParserPlugin {
       });
       parser.plugin('call goog.module', (expr) => {
         if (this.options.mode === 'NONE') {
+          if (
+            !parser.state.current.hasDependencies(
+              (dep) => dep.request === this.basePath
+            )
+          ) {
+            const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
+            parser.state.current.addDependency(
+              new GoogDependency(this.basePath, baseInsertPos)
+            );
+          }
+
           const prefixDep = parser.state.current.dependencies.find(
             (dep) => dep instanceof GoogLoaderPrefixDependency
           );

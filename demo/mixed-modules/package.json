@@ -1,0 +1,27 @@
+{
+  "name": "mixed-modules-example",
+  "version": "1.0.0",
+  "description": "An example for mixed modules(goog.require, goog.modules, ES Modules)",
+  "main": "index.js",
+  "scripts": {
+    "start": "run-s build:deps start:devserver",
+    "start:devserver": "webpack-dev-server",
+    "build": "run-s build:deps build:webpack",
+    "build:webpack": "webpack -p --env production",
+    "build:deps": "./node_modules/google-closure-library/closure/bin/build/depswriter.py --root_with_prefix 'src ../../../../src' > public/deps.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "koba04",
+  "license": "MIT",
+  "dependencies": {
+    "google-closure-library": "^20180204.0.0",
+    "object-assign": "^4.1.1"
+  },
+  "devDependencies": {
+    "closure-webpack-plugin": "0.0.24",
+    "npm-run-all": "^4.1.2",
+    "webpack": "^3.11.0",
+    "webpack-dev-server": "^2.11.1"
+  }
+}

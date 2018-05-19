@@ -10,9 +10,7 @@ It offers unmatched optimizations, provides type checking and can easily target 
 [Closure-Library](https://developers.google.com/closure/library/) is a utility library designed for full compatibility
 with Closure-Compiler. 
 
-**Note:** This plugin is a very early beta and currently uses a custom build of closure-compiler while necessary
-changes are integrated back into the main compiler repository.
-Only the java version of closure-compiler is currently supported.
+**Note:** This plugin is a very early beta. Only the java version of closure-compiler is currently supported.
 
 ## Usage example
 

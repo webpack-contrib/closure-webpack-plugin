@@ -822,8 +822,6 @@ ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE = {
   process_common_js_modules: true,
   dependency_mode: 'STRICT',
   assume_function_wrapper: true,
-  new_type_inf: true,
-  jscomp_off: 'newCheckTypesExtraChecks',
   error_format: 'JSON',
 };
 
@@ -832,8 +830,6 @@ ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD = {
   language_in: 'ECMASCRIPT_NEXT',
   language_out: 'ECMASCRIPT5_STRICT',
   json_streams: 'BOTH',
-  new_type_inf: true,
-  jscomp_off: 'newCheckTypesExtraChecks',
   error_format: 'JSON',
 };
 

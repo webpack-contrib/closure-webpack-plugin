@@ -31,7 +31,7 @@
   "dependencies": {
     "acorn": "^5.0.0",
     "acorn-dynamic-import": "^2.0.0",
-    "google-closure-compiler": ">=20180204.0.0",
+    "google-closure-compiler": "20180621.0.0-webpack-beta",
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {

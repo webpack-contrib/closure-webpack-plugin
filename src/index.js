@@ -454,7 +454,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
   }
 
   runCompiler(compilation, flags, sources) {
-    if (this.options.jsMode) {
+    if (this.options.platform !== 'JAVA') {
       return new Promise((resolve, reject) => {
         function convertError(level, compilerError) {
           return {

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { compiler: ClosureCompiler } = require('google-closure-compiler');
+const googleClosureCompiler = require('google-closure-compiler');
 const { ConcatSource, SourceMapSource } = require('webpack-sources');
 const RequestShortener = require('webpack/lib/RequestShortener');
 const HarmonyImportDependencyTemplate = require('./harmony-import-dependency-template');
@@ -187,7 +187,7 @@ class ClosureCompilerPlugin {
         ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD,
         this.compilerFlags,
         {
-          module: moduleDefs,
+          chunk: moduleDefs,
         }
       );
 
@@ -393,9 +393,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       this.compilerFlags,
       {
         entry_point: filteredEntryPoints,
-        module: moduleDefs,
+        chunk: moduleDefs,
         define: defines,
-        module_wrapper: moduleWrappers,
+        chunk_wrapper: moduleWrappers,
       }
     );
 
@@ -427,7 +427,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
             return;
           }
           const [assetName] = chunk.files;
-          const sourceMap = JSON.parse(outputFile.source_map);
+          const sourceMap = JSON.parse(
+            outputFile.source_map || outputFile.sourceMap
+          );
           sourceMap.file = assetName;
           const source = outputFile.src;
           let newSource = new SourceMapSource(
@@ -445,11 +447,52 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
         cb();
       })
-      .catch(() => cb());
+      .catch((err) => {
+        console.error(err);
+        cb();
+      });
   }
 
   runCompiler(compilation, flags, sources) {
+    if (this.options.jsMode) {
+      return new Promise((resolve, reject) => {
+        function convertError(level, compilerError) {
+          return {
+            source: compilerError.file,
+            line: compilerError.lineNo,
+            description: compilerError.description,
+            level,
+          };
+          // {source, line, description, level: 'error'|'info'|'warning'}
+          // {file: file, description: description, type: type, lineNo: lineNo, charNo: charNo};
+        }
+        const { jsCompiler: ClosureCompiler } = googleClosureCompiler;
+        const compilerRunner = new ClosureCompiler(flags);
+        const compilationResult = compilerRunner.run(sources);
+
+        const warnings = Array.prototype.slice.call(compilationResult.warnings);
+        const errors = Array.prototype.slice.call(compilationResult.errors);
+        const allErrors = warnings
+          .map(convertError.bind(null, 'warning'))
+          .concat(errors.map(convertError.bind(null, 'error')));
+        this.reportErrors(compilation, allErrors);
+        if (errors.length > 0) {
+          reject();
+          return;
+        }
+
+        resolve(compilationResult.compiledFiles);
+      }).catch((e) => {
+        console.error(e);
+        throw e;
+      });
+    }
     return new Promise((resolve, reject) => {
+      flags = Object.assign({}, flags, {
+        error_format: 'JSON',
+        json_streams: 'BOTH',
+      });
+      const { compiler: ClosureCompiler } = googleClosureCompiler;
       const compilerRunner = new ClosureCompiler(flags);
       compilerRunner.spawnOptions = { stdio: 'pipe' };
       const compilerProcess = compilerRunner.run();
@@ -487,15 +530,30 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         }
 
         if (stdErrData.length > 0) {
-          let errors;
+          let errors = [];
+          if (
+            /^com\.google\.javascript\.jscomp\.PhaseOptimizer\$NamedPass/.test(
+              stdErrData
+            )
+          ) {
+            const jsonStartIndex = stdErrData.indexOf('[');
+            errors.push({
+              level: 'warning',
+              description: stdErrData.substr(0, jsonStartIndex),
+            });
+            if (jsonStartIndex) {
+              stdErrData = stdErrData.substr(jsonStartIndex);
+            }
+          }
+
           try {
-            errors = JSON.parse(stdErrData);
+            errors = errors.concat(JSON.parse(stdErrData));
           } catch (e1) {
             const exceptionIndex = stdErrData.indexOf(']java.lang.');
             if (exceptionIndex > 0) {
               try {
-                errors = JSON.parse(
-                  stdErrData.substring(0, exceptionIndex + 1)
+                errors = errors.concat(
+                  JSON.parse(stdErrData.substring(0, exceptionIndex + 1))
                 );
                 errors.push({
                   level: 'error',
@@ -683,7 +741,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           path: toSafePath(path),
           src,
           sourceMap,
-          webpackId: webpackModule.id,
+          webpackId: `${webpackModule.id}`,
         };
       })
       .filter(
@@ -816,21 +874,17 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE = {
   language_in: 'ECMASCRIPT_NEXT',
   language_out: 'ECMASCRIPT5_STRICT',
-  json_streams: 'BOTH',
   module_resolution: 'WEBPACK',
   rename_prefix_namespace: '__wpcc',
   process_common_js_modules: true,
   dependency_mode: 'STRICT',
   assume_function_wrapper: true,
-  error_format: 'JSON',
 };
 
 /** @const */
 ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD = {
   language_in: 'ECMASCRIPT_NEXT',
   language_out: 'ECMASCRIPT5_STRICT',
-  json_streams: 'BOTH',
-  error_format: 'JSON',
 };
 
 module.exports = ClosureCompilerPlugin;

@@ -12,7 +12,6 @@ with Closure-Compiler.
 
 **Note:** This plugin is a very early beta and currently uses a custom build of closure-compiler while necessary
 changes are integrated back into the main compiler repository.
-Only the java version of closure-compiler is currently supported.
 
 ## Usage example
 
@@ -31,6 +30,9 @@ new ClosurePlugin({mode: 'STANDARD'}, {
 
 ## Options
 
+ * **platform** - `JAVASCRIPT` (default) or `JAVA`. Controls whether to use the javascript or java version of closure-compiler.
+    - `JAVASCRIPT` does not require the JVM to be installed. Not all flags are supported. 
+    - `JAVA` utilizes the jvm. Utilizes multiple threads for parsing and results in faster compilation for large builds.
  * **mode** - `STANDARD` (default), `AGGRESSIVE_BUNDLE` or `NONE`. Controls how the plugin utilizes the compiler.  
     - `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.  
     - `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but

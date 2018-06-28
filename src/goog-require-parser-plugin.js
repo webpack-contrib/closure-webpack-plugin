@@ -154,7 +154,7 @@ class GoogRequireParserPlugin {
               (dep) => dep.request === this.basePath
             )
           ) {
-            const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
+            const baseInsertPos = 0;
             parser.state.current.addDependency(
               new GoogDependency(this.basePath, baseInsertPos)
             );

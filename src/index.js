@@ -502,6 +502,8 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
                   description: stdErrData.substr(exceptionIndex + 1),
                 });
               } catch (e2) {}
+            } else {
+              errors = undefined;
             }
           }
 

@@ -21,6 +21,23 @@ function toSafePath(originalPath) {
   return originalPath.replace(UNSAFE_PATH_CHARS, '$');
 }
 
+function findMatchingChunk(chunk, chunkId, outputFile) {
+  if (chunk.files.length > 0) {
+    if (outputFile.path.length < chunk.files[0].length) {
+      return false;
+    }
+    let outputPath = outputFile.path;
+    if (!/\.js$/.test(chunk.files[0])) {
+      outputPath = outputPath.substr(0, outputPath.length - 3);
+    }
+    return (
+      outputPath.substr(outputPath.length - chunk.files[0].length) ===
+      chunk.files[0]
+    );
+  }
+  return chunk.id === chunkId;
+}
+
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     this.options = options || {};
@@ -215,33 +232,32 @@ class ClosureCompilerPlugin {
       compilationOptions.externs = externs;
 
       compilationChain = compilationChain.then(() =>
-        this.runCompiler(compilation, compilationOptions, sources).then(
-          (outputFiles) => {
+        this.runCompiler(compilation, compilationOptions, sources)
+          .then((outputFiles) => {
             outputFiles.forEach((outputFile) => {
               const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
               let chunkId;
               if (chunkIdParts) {
                 chunkId = parseInt(chunkIdParts[1], 10);
               }
-              const matchingChunk = compilation.chunks.find((chunk_) => {
-                if (chunk_.files.length > 0) {
-                  if (outputFile.path.length < chunk_.files[0].length) {
-                    return false;
-                  }
-                  return (
-                    outputFile.path.substr(
-                      outputFile.path.length - chunk_.files[0].length
-                    ) === chunk_.files[0]
-                  );
-                }
-                return chunk_.id === chunkId;
-              });
+              const matchingChunk = compilation.chunks.find((chunk_) =>
+                findMatchingChunk(chunk_, chunkId, outputFile)
+              );
               if (!matchingChunk) {
                 return;
               }
-              const assetName = chunkIdParts
-                ? chunk.files[0]
-                : outputFile.path.replace(/^\.\//, '');
+              let assetName;
+              if (chunkIdParts) {
+                assetName = chunk.files[0];
+              } else {
+                assetName = outputFile.path.replace(/^\.\//, '');
+                if (!/\.js$/.test(chunk.files[0])) {
+                  assetName = outputFile.path.substr(
+                    0,
+                    outputFile.path.length - 3
+                  );
+                }
+              }
               const sourceMap = JSON.parse(outputFile.source_map);
               sourceMap.file = assetName;
               const source = outputFile.src;
@@ -253,8 +269,10 @@ class ClosureCompilerPlugin {
                 null
               );
             });
-          }
-        )
+          })
+          .catch((e) => {
+            console.error(e);
+          })
       );
     });
 
@@ -443,25 +461,21 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           if (chunkIdParts) {
             chunkId = parseInt(chunkIdParts[1], 10);
           }
-          const chunk = compilation.chunks.find((chunk_) => {
-            if (chunk_.files.length > 0) {
-              if (outputFile.path.length < chunk_.files[0].length) {
-                return false;
-              }
-              return (
-                outputFile.path.substr(
-                  outputFile.path.length - chunk_.files[0].length
-                ) === chunk_.files[0]
-              );
-            }
-            return chunk_.id === chunkId;
-          });
+          const chunk = compilation.chunks.find((chunk_) =>
+            findMatchingChunk(chunk_, chunkId, outputFile)
+          );
           if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
             return;
           }
-          const assetName = chunkIdParts
-            ? chunk.files[0]
-            : outputFile.path.replace(/^\.\//, '');
+          let assetName;
+          if (chunkIdParts) {
+            assetName = chunk.files[0];
+          } else {
+            assetName = outputFile.path.replace(/^\.\//, '');
+            if (!/\.js$/.test(chunk.files[0])) {
+              assetName = outputFile.path.substr(0, outputFile.path.length - 3);
+            }
+          }
           const sourceMap = JSON.parse(
             outputFile.source_map || outputFile.sourceMap
           );

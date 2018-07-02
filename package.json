@@ -1,6 +1,6 @@
 {
   "name": "closure-webpack-plugin",
-  "version": "1.0.0-4",
+  "version": "1.0.0-5",
   "publishConfig": {
     "tag": "next"
   },
@@ -31,7 +31,7 @@
   "dependencies": {
     "acorn": "^5.0.0",
     "acorn-dynamic-import": "^2.0.0",
-    "google-closure-compiler": "20180624.0.0-webpack-beta",
+    "google-closure-compiler": "20180701.0.0-webpack-beta",
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {

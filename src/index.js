@@ -1,5 +1,9 @@
 const fs = require('fs');
 const googleClosureCompiler = require('google-closure-compiler');
+const {
+  getFirstSupportedPlatform,
+  getNativeImagePath,
+} = require('google-closure-compiler/lib/utils');
 const { ConcatSource, SourceMapSource } = require('webpack-sources');
 const RequestShortener = require('webpack/lib/RequestShortener');
 const HarmonyImportDependencyTemplate = require('./harmony-import-dependency-template');
@@ -31,6 +35,15 @@ class ClosureCompilerPlugin {
       this.options.childCompilations = function childCompilationSupported() {
         return false;
       };
+    }
+
+    this.options.platform = this.options.platform || [
+      'native',
+      'java',
+      'javascript',
+    ];
+    if (!Array.isArray(this.options.platform)) {
+      this.options.platform = [this.options.platform];
     }
   }
 
@@ -84,6 +97,29 @@ class ClosureCompilerPlugin {
         return;
       }
 
+      Promise.resolve().then(() => {
+        compilation.dependencyTemplates.forEach((val, key) => {
+          switch (key.name) {
+            case 'HarmonyImportDependency':
+              compilation.dependencyTemplates.set(
+                key,
+                new HarmonyImportDependencyTemplate()
+              );
+              break;
+
+            case 'HarmonyImportSpecifierDependency':
+              compilation.dependencyTemplates.set(
+                key,
+                new HarmonyImportSpecifierDependencyTemplate()
+              );
+              break;
+
+            default:
+              break;
+          }
+        });
+      });
+
       if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
         // It's very difficult to override a specific dependency template without rewriting the entire set.
         // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
@@ -108,27 +144,11 @@ class ClosureCompilerPlugin {
                 );
                 break;
 
-              case 'HarmonyImportDependency':
-                compilation.dependencyTemplates.set(
-                  key,
-                  new HarmonyImportDependencyTemplate()
-                );
-                break;
-
-              case 'HarmonyImportSpecifierDependency':
-                compilation.dependencyTemplates.set(
-                  key,
-                  new HarmonyImportSpecifierDependencyTemplate()
-                );
-                break;
-
               case 'ImportDependency':
-                if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
-                  compilation.dependencyTemplates.set(
-                    key,
-                    new ImportDependencyTemplate()
-                  );
-                }
+                compilation.dependencyTemplates.set(
+                  key,
+                  new ImportDependencyTemplate()
+                );
                 break;
 
               default:
@@ -454,7 +474,8 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
   }
 
   runCompiler(compilation, flags, sources) {
-    if (this.options.platform !== 'JAVA') {
+    const platform = getFirstSupportedPlatform(this.options.platform);
+    if (platform.toLowerCase() === 'javascript') {
       return new Promise((resolve, reject) => {
         function convertError(level, compilerError) {
           return {
@@ -495,6 +516,10 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       const { compiler: ClosureCompiler } = googleClosureCompiler;
       const compilerRunner = new ClosureCompiler(flags);
       compilerRunner.spawnOptions = { stdio: 'pipe' };
+      if (platform.toLowerCase() === 'native') {
+        compilerRunner.JAR_PATH = null;
+        compilerRunner.javaPath = getNativeImagePath();
+      }
       const compilerProcess = compilerRunner.run();
 
       let stdOutData = '';

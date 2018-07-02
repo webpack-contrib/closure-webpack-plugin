@@ -97,29 +97,6 @@ class ClosureCompilerPlugin {
         return;
       }
 
-      Promise.resolve().then(() => {
-        compilation.dependencyTemplates.forEach((val, key) => {
-          switch (key.name) {
-            case 'HarmonyImportDependency':
-              compilation.dependencyTemplates.set(
-                key,
-                new HarmonyImportDependencyTemplate()
-              );
-              break;
-
-            case 'HarmonyImportSpecifierDependency':
-              compilation.dependencyTemplates.set(
-                key,
-                new HarmonyImportSpecifierDependencyTemplate()
-              );
-              break;
-
-            default:
-              break;
-          }
-        });
-      });
-
       if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
         // It's very difficult to override a specific dependency template without rewriting the entire set.
         // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
@@ -148,6 +125,20 @@ class ClosureCompilerPlugin {
                 compilation.dependencyTemplates.set(
                   key,
                   new ImportDependencyTemplate()
+                );
+                break;
+
+              case 'HarmonyImportDependency':
+                compilation.dependencyTemplates.set(
+                  key,
+                  new HarmonyImportDependencyTemplate()
+                );
+                break;
+
+              case 'HarmonyImportSpecifierDependency':
+                compilation.dependencyTemplates.set(
+                  key,
+                  new HarmonyImportSpecifierDependencyTemplate()
                 );
                 break;
 
@@ -228,17 +219,29 @@ class ClosureCompilerPlugin {
           (outputFiles) => {
             outputFiles.forEach((outputFile) => {
               const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
-              if (!chunkIdParts) {
-                return;
+              let chunkId;
+              if (chunkIdParts) {
+                chunkId = parseInt(chunkIdParts[1], 10);
               }
-              const chunkId = parseInt(chunkIdParts[1], 10);
-              const matchingChunk = compilation.chunks.find(
-                (chunk_) => chunk_.id === chunkId
-              );
+              const matchingChunk = compilation.chunks.find((chunk_) => {
+                if (chunk_.files.length > 0) {
+                  if (outputFile.path.length < chunk_.files[0].length) {
+                    return false;
+                  }
+                  return (
+                    outputFile.path.substr(
+                      outputFile.path.length - chunk_.files[0].length
+                    ) === chunk_.files[0]
+                  );
+                }
+                return chunk_.id === chunkId;
+              });
               if (!matchingChunk) {
                 return;
               }
-              const [assetName] = matchingChunk.files;
+              const assetName = chunkIdParts
+                ? chunk.files[0]
+                : outputFile.path.replace(/^\.\//, '');
               const sourceMap = JSON.parse(outputFile.source_map);
               sourceMap.file = assetName;
               const source = outputFile.src;
@@ -436,17 +439,29 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
         outputFiles.forEach((outputFile) => {
           const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
-          if (!chunkIdParts) {
-            return;
+          let chunkId;
+          if (chunkIdParts) {
+            chunkId = parseInt(chunkIdParts[1], 10);
           }
-          const chunkId = parseInt(chunkIdParts[1], 10);
-          const chunk = compilation.chunks.find(
-            (chunk_) => chunk_.id === chunkId
-          );
+          const chunk = compilation.chunks.find((chunk_) => {
+            if (chunk_.files.length > 0) {
+              if (outputFile.path.length < chunk_.files[0].length) {
+                return false;
+              }
+              return (
+                outputFile.path.substr(
+                  outputFile.path.length - chunk_.files[0].length
+                ) === chunk_.files[0]
+              );
+            }
+            return chunk_.id === chunkId;
+          });
           if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
             return;
           }
-          const [assetName] = chunk.files;
+          const assetName = chunkIdParts
+            ? chunk.files[0]
+            : outputFile.path.replace(/^\.\//, '');
           const sourceMap = JSON.parse(
             outputFile.source_map || outputFile.sourceMap
           );
@@ -536,7 +551,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         this.reportErrors(compilation, [
           {
             level: 'error',
-            description: `Closure-compiler. Could not be launched. Is java in the path?\n${compilerRunner.prependFullCommand(
+            description: `Closure-compiler. Could not be launched.\n${compilerRunner.prependFullCommand(
               err.message
             )}`,
           },
@@ -556,21 +571,6 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
         if (stdErrData.length > 0) {
           let errors = [];
-          if (
-            /^com\.google\.javascript\.jscomp\.PhaseOptimizer\$NamedPass/.test(
-              stdErrData
-            )
-          ) {
-            const jsonStartIndex = stdErrData.indexOf('[');
-            errors.push({
-              level: 'warning',
-              description: stdErrData.substr(0, jsonStartIndex),
-            });
-            if (jsonStartIndex) {
-              stdErrData = stdErrData.substr(jsonStartIndex);
-            }
-          }
-
           try {
             errors = errors.concat(JSON.parse(stdErrData));
           } catch (e1) {
@@ -627,6 +627,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     nextUniqueId
   ) {
     let chunkSources;
+    const chunkName = chunk.files.length
+      ? chunk.files[0].replace(/\.js$/, '')
+      : `chunk-${chunk.id}`;
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       chunkSources = ClosureCompilerPlugin.getChunkSources(chunk, () => {
         const newId = nextUniqueId;
@@ -634,7 +637,6 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         return newId;
       });
     } else {
-      const chunkName = `chunk-${chunk.id}`;
       let src = '';
       let sourceMap = null;
       try {
@@ -654,7 +656,6 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     }
 
     sources.push(...chunkSources);
-    const chunkName = `chunk-${chunk.id}`;
     let moduleDef = `${chunkName}:${chunkSources.length}`;
     if (baseModule) {
       moduleDef += `:${baseModule}`;

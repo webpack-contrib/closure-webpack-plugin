@@ -21,21 +21,25 @@ function toSafePath(originalPath) {
   return originalPath.replace(UNSAFE_PATH_CHARS, '$');
 }
 
-function findMatchingChunk(chunk, chunkId, outputFile) {
-  if (chunk.files.length > 0) {
-    if (outputFile.path.length < chunk.files[0].length) {
-      return false;
+function findChunkFile(chunk, chunkId, outputFilePath) {
+  for (let i = 0; i < chunk.files.length; i++) {
+    const chunkFile = chunk.files[i];
+    let normalizedOutputFilePath = outputFilePath.replace(/^\.\//, '');
+    if (!/\.js$/.test(chunkFile)) {
+      normalizedOutputFilePath = normalizedOutputFilePath.substr(
+        0,
+        normalizedOutputFilePath.length - 3
+      );
     }
-    let outputPath = outputFile.path;
-    if (!/\.js$/.test(chunk.files[0])) {
-      outputPath = outputPath.substr(0, outputPath.length - 3);
+
+    if (normalizedOutputFilePath === chunkFile) {
+      return chunkFile;
     }
-    return (
-      outputPath.substr(outputPath.length - chunk.files[0].length) ===
-      chunk.files[0]
-    );
   }
-  return chunk.id === chunkId;
+  if (chunk.id === chunkId) {
+    return chunk.files[0];
+  }
+  return undefined;
 }
 
 class ClosureCompilerPlugin {
@@ -241,7 +245,7 @@ class ClosureCompilerPlugin {
                 chunkId = parseInt(chunkIdParts[1], 10);
               }
               const matchingChunk = compilation.chunks.find((chunk_) =>
-                findMatchingChunk(chunk_, chunkId, outputFile)
+                findChunkFile(chunk_, chunkId, outputFile.path)
               );
               if (!matchingChunk) {
                 return;
@@ -364,11 +368,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     }
 
     if (jsonpRuntimeRequired) {
-      allSources.splice(
-        2,
-        0,
-        ClosureCompilerPlugin.renderRuntime(compilation, chunkMap)
-      );
+      allSources.splice(2, 0, this.renderRuntime(compilation, chunkMap));
       baseModuleCount += 1;
       moduleDefs[0] = `${BASE_MODULE_NAME}:${baseModuleCount}`;
     }
@@ -407,20 +407,26 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         const defParts = moduleDef.split(':');
         const chunkIdParts = /^chunk-(\d+)$/.exec(defParts[0]);
         let parentChunk = null;
-        if (chunkIdParts) {
-          const chunkId = parseInt(chunkIdParts[1], 10);
-          chunkFlatMap.forEach((parent, chunk) => {
-            if (chunk && chunk.id === chunkId) {
+        const chunkId = chunkIdParts
+          ? parseInt(chunkIdParts[1], 10)
+          : undefined;
+        let chunkFilename = null;
+        let chunk = null;
+        chunkFlatMap.forEach((parent, chunk_) => {
+          if (chunk_) {
+            chunkFilename = findChunkFile(chunk_, chunkId, `${defParts[0]}.js`);
+            if (chunkFilename) {
+              chunk = chunk_;
               parentChunk = parent;
             }
-          });
-        }
+          }
+        });
 
         if (parentChunk !== null) {
           return `${defParts[0]}:webpackJsonp([${
-            chunkIdParts[1]
+            chunk.id
           }], function(__wpcc){%s});`;
-        } else if (chunkIdParts) {
+        } else if (chunk) {
           return `${defParts[0]}:${entryChunkWrapper}`;
         }
 
@@ -462,20 +468,12 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
             chunkId = parseInt(chunkIdParts[1], 10);
           }
           const chunk = compilation.chunks.find((chunk_) =>
-            findMatchingChunk(chunk_, chunkId, outputFile)
+            findChunkFile(chunk_, chunkId, outputFile.path)
           );
           if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
             return;
           }
-          let assetName;
-          if (chunkIdParts) {
-            assetName = chunk.files[0];
-          } else {
-            assetName = outputFile.path.replace(/^\.\//, '');
-            if (!/\.js$/.test(chunk.files[0])) {
-              assetName = outputFile.path.substr(0, outputFile.path.length - 3);
-            }
-          }
+          const assetName = findChunkFile(chunk, chunkId, outputFile.path);
           const sourceMap = JSON.parse(
             outputFile.source_map || outputFile.sourceMap
           );
@@ -631,6 +629,32 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     });
   }
 
+  getChunkFilenameTemplate(compilation, chunk) {
+    let filenameTemplate;
+    if (this.options.output) {
+      let filename = compilation.outputOptions.filename;
+      if (this.options.output && this.options.output.filename) {
+        filename = this.options.output.filename;
+      }
+      let chunkFilename = compilation.outputOptions.chunkFilename;
+      if (this.options.output && this.options.output.chunkFilename) {
+        chunkFilename = this.options.output.chunkFilename;
+      } else if (this.options.output && this.options.output.filename) {
+        chunkFilename = filename;
+      } else {
+        chunkFilename = compilation.outputOptions.chunkFilename;
+      }
+      filenameTemplate = chunk.isInitial() ? filename : chunkFilename;
+    } else {
+      const filename = compilation.outputOptions.filename;
+      const chunkFilename = compilation.outputOptions.chunkFilename;
+      filenameTemplate = chunk.filenameTemplate
+        ? chunk.filenameTemplate
+        : chunk.isInitial() ? filename : chunkFilename;
+    }
+    return filenameTemplate;
+  }
+
   addChunksToCompilation(
     compilation,
     chunk,
@@ -640,10 +664,21 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     moduleDefs,
     nextUniqueId
   ) {
+    const filenameTemplate = this.getChunkFilenameTemplate(compilation, chunk);
+    const useChunkHash =
+      !chunk.hasRuntime() ||
+      (compilation.mainTemplate.useChunkHash &&
+        compilation.mainTemplate.useChunkHash(chunk));
+
+    const chunkName = compilation.getPath(filenameTemplate, {
+      noChunkHash: !useChunkHash,
+      chunk,
+    });
+    if (!chunk.files.includes(chunkName)) {
+      chunk.files.push(chunkName);
+    }
+
     let chunkSources;
-    const chunkName = chunk.files.length
-      ? chunk.files[0].replace(/\.js$/, '')
-      : `chunk-${chunk.id}`;
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       chunkSources = ClosureCompilerPlugin.getChunkSources(chunk, () => {
         const newId = nextUniqueId;
@@ -670,7 +705,8 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     }
 
     sources.push(...chunkSources);
-    let moduleDef = `${chunkName}:${chunkSources.length}`;
+    const moduleName = chunkName.replace(/\.js$/, '');
+    let moduleDef = `${moduleName}:${chunkSources.length}`;
     if (baseModule) {
       moduleDef += `:${baseModule}`;
     }
@@ -683,7 +719,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           childChunk,
           sources,
           chunkMap,
-          chunkName,
+          moduleName,
           moduleDefs,
           nextUniqueId
         );
@@ -803,12 +839,16 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    * @param {Map} chunks Tree map of chunks and child chunks
    * @return {string}
    */
-  static renderRuntime(compilation, chunks) {
+  renderRuntime(compilation, chunks) {
     const srcPathPerChunk = [];
-    function setChunkPaths(parentChunk, childChunksMap, chunkMaps) {
+    const setChunkPaths = (parentChunk, childChunksMap, chunkMaps) => {
+      const filenameTemplate = this.getChunkFilenameTemplate(
+        compilation,
+        parentChunk
+      );
       const scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall(
         'asset-path',
-        JSON.stringify(compilation.outputOptions.chunkFilename),
+        JSON.stringify(filenameTemplate),
         {
           hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(
             compilation.hash
@@ -846,7 +886,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       childChunksMap.forEach((grandchildrenChunksMap, childChunk) => {
         setChunkPaths(childChunk, grandchildrenChunksMap, chunkMaps);
       });
-    }
+    };
     chunks.forEach((childChunksMap, entryChunk) => {
       childChunksMap.forEach((grandchildChunksMap, childChunk) => {
         setChunkPaths(

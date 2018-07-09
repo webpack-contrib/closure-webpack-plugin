@@ -15,6 +15,8 @@ const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
 const GoogDependency = require('./goog-dependency');
 const GoogLoaderPrefixDependency = require('./goog-loader-prefix-dependency');
 const GoogLoaderSuffixDependency = require('./goog-loader-suffix-dependency');
+const validateOptions = require('schema-utils');
+const closureWebpackPluginSchema = require('../schema/plugin.json');
 
 const UNSAFE_PATH_CHARS = /[^-a-z0-9_$/\\.:]+/gi;
 function toSafePath(originalPath) {
@@ -44,27 +46,40 @@ function findChunkFile(chunk, chunkId, outputFilePath) {
 
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
-    this.options = options || {};
-    this.compilerFlags = compilerFlags || {};
+    validateOptions(
+      closureWebpackPluginSchema,
+      options || {},
+      'closure-webpack-plugin'
+    );
+    this.options = Object.assign(
+      {},
+      ClosureCompilerPlugin.DEFAULT_OPTIONS,
+      options || {}
+    );
     if (typeof this.options.childCompilations === 'boolean') {
       this.options.childCompilations = function childCompilationSupported(
         childrenSupported
       ) {
         return childrenSupported;
       }.bind(this, this.options.childCompilations);
-    } else if (typeof this.options.childCompilations !== 'function') {
-      this.options.childCompilations = function childCompilationSupported() {
-        return false;
-      };
     }
 
-    this.options.platform = this.options.platform || [
-      'native',
-      'java',
-      'javascript',
-    ];
     if (!Array.isArray(this.options.platform)) {
       this.options.platform = [this.options.platform];
+    }
+
+    if (this.options.mode === 'STANDARD') {
+      this.compilerFlags = Object.assign(
+        {},
+        compilerFlags || {},
+        ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD
+      );
+    } else if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
+      this.compilerFlags = Object.assign(
+        {},
+        compilerFlags || {},
+        ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE
+      );
     }
   }
 
@@ -168,17 +183,6 @@ class ClosureCompilerPlugin {
             }
           });
         });
-      } else if (
-        this.options.mode &&
-        this.options.mode !== 'STANDARD' &&
-        this.options.mode !== 'NONE'
-      ) {
-        this.reportErrors(compilation, [
-          {
-            level: 'warn',
-            description: 'invalid plugin mode',
-          },
-        ]);
       }
 
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) => {
@@ -214,14 +218,9 @@ class ClosureCompilerPlugin {
         uniqueId
       );
 
-      const compilationOptions = Object.assign(
-        {},
-        ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD,
-        this.compilerFlags,
-        {
-          chunk: moduleDefs,
-        }
-      );
+      const compilationOptions = Object.assign({}, this.compilerFlags, {
+        chunk: moduleDefs,
+      });
 
       let externs = [];
 
@@ -434,17 +433,12 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
       })
       .filter((wrapper) => wrapper !== null);
 
-    const compilationOptions = Object.assign(
-      {},
-      ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE,
-      this.compilerFlags,
-      {
-        entry_point: filteredEntryPoints,
-        chunk: moduleDefs,
-        define: defines,
-        chunk_wrapper: moduleWrappers,
-      }
-    );
+    const compilationOptions = Object.assign({}, this.compilerFlags, {
+      entry_point: filteredEntryPoints,
+      chunk: moduleDefs,
+      define: defines,
+      chunk_wrapper: moduleWrappers,
+    });
 
     /**
      * Invoke the compiler and return a promise of the results.
@@ -951,6 +945,13 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     });
   }
 }
+
+/** @const */
+ClosureCompilerPlugin.DEFAULT_OPTIONS = {
+  childCompilations: false,
+  mode: 'STANDARD',
+  platform: ['native', 'java', 'javascript'],
+};
 
 /** @const */
 ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE = {

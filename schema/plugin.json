@@ -1,0 +1,74 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "platform": {
+      "type": "string",
+      "enum": ["java", "javascript", "native"]
+    }
+  },
+  "properties": {
+    "childCompilations": {
+      "description": "Whether closure-compiler should run during child compilations",
+      "oneOf": [{
+        "type": "boolean"
+      }, {
+        "instanceof": "Function"
+      }]
+    },
+    "closureLibraryBase": {
+      "description": "Path to Closure-Library's base.js file",
+      "type": "string"
+    },
+    "deps": {
+      "description": "Path to a Closure-Library deps file",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "extraDeps": {
+      "description": "A map of name to path of additional closure-library style dependencies",
+      "type": "object"
+    },
+    "filename": {
+      "description": "The filename and path that ExtractTextPlugin will extract to",
+      "modes": {
+        "type": ["string", "function"]
+      }
+    },
+    "mode": {
+      "description": "Methodology used to bundle assets in a chunk",
+      "type": "string",
+      "enum": ["AGGRESSIVE_BUNDLE", "STANDARD", "NONE"]
+    },
+    "output": {
+      "description": "",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chunkFilename": {
+          "description": "The filename of non-entry chunks as relative path inside the `output.path` directory.",
+          "type": "string",
+          "absolutePath": false
+        },
+        "filename": {
+          "description": "The filename of non-entry chunks as relative path inside the `output.path` directory.",
+          "type": "string",
+          "absolutePath": false
+        }
+      }
+    },
+    "platform": {
+      "description": "Version of closure-compiler used. May be an array of preference order",
+      "oneOf": [{
+        "$ref": "#/definitions/platform"
+      }, {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/platform"
+        }
+      }]
+    }
+  }
+}

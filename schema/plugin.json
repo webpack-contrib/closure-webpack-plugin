@@ -31,12 +31,6 @@
       "description": "A map of name to path of additional closure-library style dependencies",
       "type": "object"
     },
-    "filename": {
-      "description": "The filename and path that ExtractTextPlugin will extract to",
-      "modes": {
-        "type": ["string", "function"]
-      }
-    },
     "mode": {
       "description": "Methodology used to bundle assets in a chunk",
       "type": "string",

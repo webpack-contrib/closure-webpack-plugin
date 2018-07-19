@@ -10,9 +10,6 @@ It offers unmatched optimizations, provides type checking and can easily target 
 [Closure-Library](https://developers.google.com/closure/library/) is a utility library designed for full compatibility
 with Closure-Compiler. 
 
-**Note:** This plugin is a very early beta and currently uses a custom build of closure-compiler while necessary
-changes are integrated back into the main compiler repository.
-
 ## Usage example
 
 ```js
@@ -30,9 +27,11 @@ new ClosurePlugin({mode: 'STANDARD'}, {
 
 ## Options
 
- * **platform** - `JAVASCRIPT` (default) or `JAVA`. Controls whether to use the javascript or java version of closure-compiler.
+ * **platform** - `native`, `java` or `javascript`. Controls which version to use of closure-compiler.
+     By default the plugin will attempt to automatically choose the fastest option available.
     - `JAVASCRIPT` does not require the JVM to be installed. Not all flags are supported. 
     - `JAVA` utilizes the jvm. Utilizes multiple threads for parsing and results in faster compilation for large builds.
+    - `NATIVE` only available on linux or MacOS. Faster compilation times without requiring a JVM.
  * **mode** - `STANDARD` (default), `AGGRESSIVE_BUNDLE` or `NONE`. Controls how the plugin utilizes the compiler.  
     - `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.  
     - `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file, but

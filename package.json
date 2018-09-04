@@ -4,7 +4,7 @@
   "description": "Webpack Google Closure Compiler and Closure Library plugin",
   "author": "Chad Killingsworth (@ChadKillingsworth)",
   "license": "MIT",
-  "main": "src/index.js",
+  "main": "src/closure-webpack-plugin.js",
   "files": [
     "src",
     "schema"
@@ -29,7 +29,7 @@
   "dependencies": {
     "acorn": "^5.0.0",
     "acorn-dynamic-import": "^2.0.0",
-    "google-closure-compiler": ">=20180716.0.1",
+    "google-closure-compiler": ">=20180805.0.0",
     "schema-utils": "^0.4.5",
     "webpack-sources": "^1.0.1"
   },

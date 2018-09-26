@@ -46,6 +46,8 @@ function findChunkFile(chunk, chunkId, outputFilePath) {
   return undefined; // eslint-disable-line no-undefined
 }
 
+const PLUGIN = { name: 'ClosureCompilerPlugin' };
+
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     validateOptions(
@@ -88,12 +90,12 @@ class ClosureCompilerPlugin {
   apply(compiler) {
     this.requestShortener = new RequestShortener(compiler.context);
 
-    if (compiler.tap) {
-      compiler.tap('compilation', (compilation, params) =>
+    if (compiler.hooks) {
+      compiler.hooks.compilation.tap(PLUGIN, (compilation, params) =>
         this.complation_(compilation, params)
       );
     } else {
-      compiler.plugin('compilation', (compilation, params) =>
+      compiler.plugin(PLUGIN, (compilation, params) =>
         this.complation_(compilation, params)
       );
     }
@@ -116,8 +118,8 @@ class ClosureCompilerPlugin {
       const parserPluginCallback = (parser) => {
         parser.apply(new GoogRequireParserPlugin(parserPluginOptions));
       };
-      if (normalModuleFactory.tap) {
-        normalModuleFactory.tap('parser', parserPluginCallback);
+      if (normalModuleFactory.hooks) {
+        normalModuleFactory.hooks.parser.tap(PLUGIN, parserPluginCallback);
       } else {
         normalModuleFactory.plugin('parser', parserPluginCallback);
       }
@@ -203,11 +205,22 @@ class ClosureCompilerPlugin {
       });
     }
 
-    if (compilation.tapAsync) {
-      compilation.tapAsync('optimize-chunk-assets', (originalChunks, cb) =>
-        this.optimizeChunkAssets_(compilation, originalChunks, cb)
+    const buildModuleFn = (moduleArg) => {
+      // to get detailed location info about errors
+      moduleArg.useSourceMap = true;
+    };
+
+    if (compilation.hooks) {
+      compilation.hooks.buildModule.tap(PLUGIN, buildModuleFn);
+
+      compilation.hooks.optimizeChunkAssets.tapAsync(
+        PLUGIN,
+        (originalChunks, cb) =>
+          this.optimizeChunkAssets_(compilation, originalChunks, cb)
       );
     } else {
+      compilation.plugin('build-module', buildModuleFn);
+
       compilation.plugin('optimize-chunk-assets', (originalChunks, cb) =>
         this.optimizeChunkAssets_(compilation, originalChunks, cb)
       );
@@ -250,7 +263,7 @@ class ClosureCompilerPlugin {
           ) {
             parentChunkName = this.getChunkName(
               compilation,
-              chunkGroup.getParents()[0]
+              chunkGroup.getParents()[0].chunks[0]
             ).replace(/\.js$/, '');
           }
           chunkGroup.chunks.forEach((chunk) => {
@@ -713,9 +726,16 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     } else {
       const { filename } = compilation.outputOptions;
       const { chunkFilename } = compilation.outputOptions;
-      filenameTemplate = chunk.filenameTemplate
-        ? chunk.filenameTemplate
-        : chunk.isInitial() ? filename : chunkFilename;
+      if (chunk.filenameTemplate) {
+        filenameTemplate = chunk.filenameTemplate;
+      } else if (
+        (chunk.canBeInitial && chunk.canBeInitial()) ||
+        (!chunk.canBeInitial && chunk.isInitial())
+      ) {
+        filenameTemplate = filename;
+      } else {
+        filenameTemplate = chunkFilename;
+      }
     }
     return filenameTemplate;
   }

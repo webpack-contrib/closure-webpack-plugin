@@ -5,6 +5,8 @@ const walk = require('acorn/dist/walk');
 const GoogDependency = require('./goog-dependency');
 const GoogLoaderPrefixDependency = require('./goog-loader-prefix-dependency');
 const GoogLoaderSuffixDependency = require('./goog-loader-suffix-dependency');
+const GoogLoaderEs6PrefixDependency = require('./goog-loader-es6-prefix-dependency');
+const GoogLoaderEs6SuffixDependency = require('./goog-loader-es6-suffix-dependency');
 
 class GoogRequireParserPlugin {
   constructor(options) {
@@ -76,10 +78,7 @@ class GoogRequireParserPlugin {
           (dep) => dep.request === this.basePath
         )
       ) {
-        const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
-        parser.state.current.addDependency(
-          new GoogDependency(this.basePath, baseInsertPos)
-        );
+        this.addGoogDependency(parser, this.basePath);
       }
 
       // For goog.provide calls, add loader code and exit
@@ -104,10 +103,7 @@ class GoogRequireParserPlugin {
           );
           return false;
         }
-        const insertPosition = this.options.mode === 'NONE' ? 0 : null;
-        parser.state.current.addDependency(
-          new GoogDependency(modulePath, insertPosition)
-        );
+        this.addGoogDependency(parser, modulePath);
       } catch (e) {
         parser.state.compilation.errors.push(e);
       }
@@ -154,10 +150,7 @@ class GoogRequireParserPlugin {
               (dep) => dep.request === this.basePath
             )
           ) {
-            const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
-            parser.state.current.addDependency(
-              new GoogDependency(this.basePath, baseInsertPos)
-            );
+            this.addGoogDependency(parser, this.basePath);
           }
 
           const prefixDep = parser.state.current.dependencies.find(
@@ -174,7 +167,49 @@ class GoogRequireParserPlugin {
           }
         }
       });
+      parser.plugin('call goog.module.declareNamespace', () => {
+        if (
+          !parser.state.current.hasDependencies(
+            (dep) => dep.request === this.basePath
+          )
+        ) {
+          this.addGoogDependency(parser, this.basePath);
+        }
+
+        parser.state.current.addVariable(
+          '$jscomp',
+          'window.$jscomp = window.$jscomp || {}',
+          []
+        );
+
+        this.addEs6LoaderDependency(parser);
+      });
+      parser.plugin('import', () => {
+        parser.state.current.addVariable(
+          '$jscomp',
+          'window.$jscomp = window.$jscomp || {}',
+          []
+        );
+        this.addEs6LoaderDependency(parser);
+      });
+      parser.plugin('export', () => {
+        parser.state.current.addVariable(
+          '$jscomp',
+          'window.$jscomp = window.$jscomp || {}',
+          []
+        );
+        this.addEs6LoaderDependency(parser);
+      });
     }
+  }
+
+  addGoogDependency(parser, request) {
+    // ES6 prefixing must happen after all requires have loaded otherwise
+    // Closure library can think an ES6 module is calling goog.provide/module.
+    const baseInsertPos = this.options.mode === 'NONE' ? -1 : null;
+    parser.state.current.addDependency(
+      new GoogDependency(request, baseInsertPos)
+    );
   }
 
   addLoaderDependency(parser, isModule) {
@@ -184,6 +219,30 @@ class GoogRequireParserPlugin {
     const sourceLength = parser.state.current._source.source().length;
     parser.state.current.addDependency(
       new GoogLoaderSuffixDependency(this.basePath, isModule, sourceLength)
+    );
+  }
+
+  addEs6LoaderDependency(parser) {
+    if (
+      parser.state.current.dependencies.some(
+        (dep) => dep instanceof GoogLoaderEs6PrefixDependency
+      )
+    ) {
+      return;
+    }
+
+    // ES6 prefixing must happen after all requires have loaded otherwise
+    // Closure library can think an ES6 module is calling goog.provide/module.
+    const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
+    const sourceLength =
+      this.options.mode === 'NONE'
+        ? parser.state.current._source.source().length
+        : null;
+    parser.state.current.addDependency(
+      new GoogLoaderEs6PrefixDependency(baseInsertPos)
+    );
+    parser.state.current.addDependency(
+      new GoogLoaderEs6SuffixDependency(sourceLength)
     );
   }
 }

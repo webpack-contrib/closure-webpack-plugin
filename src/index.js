@@ -15,6 +15,9 @@ const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
 const GoogDependency = require('./goog-dependency');
 const GoogLoaderPrefixDependency = require('./goog-loader-prefix-dependency');
 const GoogLoaderSuffixDependency = require('./goog-loader-suffix-dependency');
+const GoogLoaderEs6PrefixDependency = require('./goog-loader-es6-prefix-dependency');
+const GoogLoaderEs6SuffixDependency = require('./goog-loader-es6-suffix-dependency');
+const NullFactory = require('webpack/lib/NullFactory');
 const validateOptions = require('schema-utils');
 const closureWebpackPluginSchema = require('../schema/plugin.json');
 
@@ -126,6 +129,22 @@ class ClosureCompilerPlugin {
         compilation.dependencyTemplates.set(
           GoogLoaderSuffixDependency,
           new GoogLoaderSuffixDependency.Template()
+        );
+        compilation.dependencyFactories.set(
+          GoogLoaderEs6PrefixDependency,
+          new NullFactory()
+        );
+        compilation.dependencyTemplates.set(
+          GoogLoaderEs6PrefixDependency,
+          new GoogLoaderEs6PrefixDependency.Template()
+        );
+        compilation.dependencyFactories.set(
+          GoogLoaderEs6SuffixDependency,
+          new NullFactory()
+        );
+        compilation.dependencyTemplates.set(
+          GoogLoaderEs6SuffixDependency,
+          new GoogLoaderEs6SuffixDependency.Template()
         );
       }
 

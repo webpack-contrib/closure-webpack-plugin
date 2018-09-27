@@ -15,11 +15,10 @@
   "author": "koba04",
   "license": "MIT",
   "dependencies": {
-    "google-closure-library": "^20180204.0.0",
+    "google-closure-library": "^20180805.0.0",
     "object-assign": "^4.1.1"
   },
   "devDependencies": {
-    "closure-webpack-plugin": "0.0.24",
     "npm-run-all": "^4.1.2",
     "webpack": "^3.11.0",
     "webpack-dev-server": "^2.11.1"

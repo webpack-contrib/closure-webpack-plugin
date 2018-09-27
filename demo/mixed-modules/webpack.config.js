@@ -1,6 +1,6 @@
 const webpack = require('webpack');
 const path = require('path');
-const ClosurePlugin = require('closure-webpack-plugin');
+const ClosurePlugin = require('../../src/index');
 
 module.exports = (env) => {
   const isProduction = env === 'production';

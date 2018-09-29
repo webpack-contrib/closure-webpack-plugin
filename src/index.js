@@ -74,14 +74,14 @@ class ClosureCompilerPlugin {
     if (this.options.mode === 'STANDARD') {
       this.compilerFlags = Object.assign(
         {},
-        compilerFlags || {},
-        ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD
+        ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD,
+        compilerFlags || {}
       );
     } else if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       this.compilerFlags = Object.assign(
         {},
-        compilerFlags || {},
-        ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE
+        ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE,
+        compilerFlags || {}
       );
     }
   }

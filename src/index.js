@@ -416,7 +416,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     );
 
     const entryChunkWrapper =
-      'var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this, __wpcc);';
+      'var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this || window, __wpcc);';
     const moduleWrappers = moduleDefs
       .map((moduleDef) => {
         if (/^required-base:/.test(moduleDef)) {

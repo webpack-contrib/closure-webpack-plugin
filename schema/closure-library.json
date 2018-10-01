@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "closureLibraryBase": {
+      "description": "Path to Closure-Library's base.js file",
+      "type": "string"
+    },
+    "deps": {
+      "description": "Path to a Closure-Library deps file",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "extraDeps": {
+      "description": "A map of name to path of additional closure-library style dependencies",
+      "type": "object"
+    }
+  }
+}

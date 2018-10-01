@@ -12,21 +12,11 @@ const HarmonyImportSpecifierDependencyTemplate = require('./dependencies/harmony
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
 const ImportDependencyTemplate = require('./dependencies/import-dependency-template');
 const AMDDefineDependencyTemplate = require('./dependencies/amd-define-dependency-template');
-const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
-const GoogDependency = require('./dependencies/goog-dependency');
-const GoogLoaderPrefixDependency = require('./dependencies/goog-loader-prefix-dependency');
-const GoogLoaderSuffixDependency = require('./dependencies/goog-loader-suffix-dependency');
-const GoogLoaderEs6PrefixDependency = require('./dependencies/goog-loader-es6-prefix-dependency');
-const GoogLoaderEs6SuffixDependency = require('./dependencies/goog-loader-es6-suffix-dependency');
-const NullFactory = require('webpack/lib/NullFactory');
 const validateOptions = require('schema-utils');
-const closureWebpackPluginSchema = require('../schema/plugin.json');
+const closureCompilerPluginSchema = require('../schema/closure-compiler.json');
 const toSafePath = require('./safe-path');
-const {
-  buildChunkGroupsFromChunks,
-  Webpack3Entrypoint,
-} = require('./chunk-groups-polyfill');
 const getChunkSources = require('./chunk-sources');
+const ClosureLibraryPlugin = require('./closure-library-plugin');
 
 function findChunkFile(chunk, chunkId, outputFilePath) {
   for (let i = 0; i < chunk.files.length; i++) {
@@ -54,7 +44,7 @@ const PLUGIN = { name: 'ClosureCompilerPlugin' };
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
     validateOptions(
-      closureWebpackPluginSchema,
+      closureCompilerPluginSchema,
       options || {},
       'closure-webpack-plugin'
     );
@@ -93,80 +83,15 @@ class ClosureCompilerPlugin {
   apply(compiler) {
     this.requestShortener = new RequestShortener(compiler.context);
 
-    if (compiler.hooks) {
-      compiler.hooks.compilation.tap(PLUGIN, (compilation, params) =>
-        this.complation_(compilation, params)
-      );
-    } else {
-      compiler.plugin(PLUGIN, (compilation, params) =>
-        this.complation_(compilation, params)
-      );
-    }
+    compiler.hooks.compilation.tap(PLUGIN, (compilation, params) =>
+      this.complation_(compilation, params)
+    );
   }
 
   complation_(compilation, params) {
     const runFullCompilation =
       !compilation.compiler.parentCompilation ||
       this.options.childCompilations(compilation);
-
-    if (
-      this.options.closureLibraryBase &&
-      (this.options.deps || this.options.extraDeps)
-    ) {
-      const parserPluginOptions = Object.assign({}, this.options, {
-        mode: runFullCompilation ? this.options.mode : 'NONE',
-      });
-
-      const { normalModuleFactory } = params;
-      const parserPluginCallback = (parser) => {
-        parser.apply(new GoogRequireParserPlugin(parserPluginOptions));
-      };
-      if (normalModuleFactory.hooks) {
-        normalModuleFactory.hooks.parser.tap(PLUGIN, parserPluginCallback);
-      } else {
-        normalModuleFactory.plugin('parser', parserPluginCallback);
-      }
-      compilation.dependencyFactories.set(
-        GoogDependency,
-        params.normalModuleFactory
-      );
-      compilation.dependencyTemplates.set(
-        GoogDependency,
-        new GoogDependency.Template()
-      );
-      compilation.dependencyFactories.set(
-        GoogLoaderPrefixDependency,
-        params.normalModuleFactory
-      );
-      compilation.dependencyTemplates.set(
-        GoogLoaderPrefixDependency,
-        new GoogLoaderPrefixDependency.Template()
-      );
-      compilation.dependencyFactories.set(
-        GoogLoaderSuffixDependency,
-        params.normalModuleFactory
-      );
-      compilation.dependencyTemplates.set(
-        GoogLoaderSuffixDependency,
-        new GoogLoaderSuffixDependency.Template()
-      );
-      compilation.dependencyFactories.set(
-        GoogLoaderEs6PrefixDependency,
-        new NullFactory()
-      );
-      compilation.dependencyTemplates.set(
-        GoogLoaderEs6PrefixDependency,
-        new GoogLoaderEs6PrefixDependency.Template()
-      );
-      compilation.dependencyFactories.set(
-        GoogLoaderEs6SuffixDependency,
-        new NullFactory()
-      );
-      compilation.dependencyTemplates.set(
-        GoogLoaderEs6SuffixDependency,
-        new GoogLoaderEs6SuffixDependency.Template()
-      );
-    }
 
     if (!runFullCompilation) {
       return;
@@ -224,26 +149,16 @@ class ClosureCompilerPlugin {
       });
     }
 
-    const buildModuleFn = (moduleArg) => {
+    compilation.hooks.buildModule.tap(PLUGIN, (moduleArg) => {
       // to get detailed location info about errors
       moduleArg.useSourceMap = true;
-    };
+    });
 
-    if (compilation.hooks) {
-      compilation.hooks.buildModule.tap(PLUGIN, buildModuleFn);
-
-      compilation.hooks.optimizeChunkAssets.tapAsync(
-        PLUGIN,
-        (originalChunks, cb) =>
-          this.optimizeChunkAssets_(compilation, originalChunks, cb)
-      );
-    } else {
-      compilation.plugin('build-module', buildModuleFn);
-
-      compilation.plugin('optimize-chunk-assets', (originalChunks, cb) =>
+    compilation.hooks.optimizeChunkAssets.tapAsync(
+      PLUGIN,
+      (originalChunks, cb) =>
         this.optimizeChunkAssets_(compilation, originalChunks, cb)
-      );
-    }
+    );
   }
 
   optimizeChunkAssets_(compilation, originalChunks, cb) {
@@ -259,27 +174,16 @@ class ClosureCompilerPlugin {
   standardBundle(compilation, originalChunks, cb) {
     let uniqueId = 1;
     let compilationChain = Promise.resolve();
-    const chunkGroups = compilation.chunkGroups
-      ? compilation.chunkGroups
-      : buildChunkGroupsFromChunks(originalChunks);
+    const { chunkGroups } = compilation;
 
     chunkGroups
-      .filter(
-        (chunkGroup) =>
-          chunkGroup instanceof Entrypoint ||
-          chunkGroup instanceof Webpack3Entrypoint
-      )
+      .filter((chunkGroup) => chunkGroup instanceof Entrypoint)
       .forEach((entrypoint) => {
         const chunkDefs = [];
         const sources = [];
         const addGroupChunksToCompilation = (chunkGroup) => {
           let parentChunkName = null;
-          if (
-            !(
-              chunkGroup instanceof Entrypoint ||
-              chunkGroup instanceof Webpack3Entrypoint
-            )
-          ) {
+          if (!(chunkGroup instanceof Entrypoint)) {
             parentChunkName = this.getChunkName(
               compilation,
               chunkGroup.getParents()[0].chunks[0]
@@ -391,9 +295,7 @@ class ClosureCompilerPlugin {
 
     let baseChunkSourceCount = allSources.length;
 
-    const chunkGroups = compilation.chunkGroups
-      ? compilation.chunkGroups
-      : buildChunkGroupsFromChunks(originalChunks);
+    const { chunkGroups } = compilation;
 
     const BASE_CHUNK_NAME = 'required-base';
     const entryChunkWrapper =
@@ -409,10 +311,7 @@ class ClosureCompilerPlugin {
     chunkGroups.forEach((chunkGroup) => {
       let isEntrypoint = false;
       let parentChunkName;
-      if (
-        chunkGroup instanceof Entrypoint ||
-        chunkGroup instanceof Webpack3Entrypoint
-      ) {
+      if (chunkGroup instanceof Entrypoint) {
         isEntrypoint = true;
         parentChunkName = BASE_CHUNK_NAME;
       } else {
@@ -957,12 +856,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
     };
 
     chunkGroups.forEach((chunkGroup) => {
-      if (
-        !(
-          chunkGroup instanceof Entrypoint ||
-          chunkGroup instanceof Webpack3Entrypoint
-        )
-      ) {
+      if (!(chunkGroup instanceof Entrypoint)) {
         chunkGroup.chunks.forEach((chunk) => {
           setChunkPath(chunk, chunkGroup.getParents()[0]);
         });
@@ -1049,3 +943,4 @@ ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD = {
 };
 
 module.exports = ClosureCompilerPlugin;
+module.exports.LibraryPlugin = ClosureLibraryPlugin;

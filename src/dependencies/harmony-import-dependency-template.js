@@ -1,3 +1,5 @@
+const HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency');
+
 function getOptionalComment(pathinfo, shortenedRequest) {
   if (!pathinfo) {
     return '';
@@ -5,10 +7,10 @@ function getOptionalComment(pathinfo, shortenedRequest) {
   return `/*! ${shortenedRequest} */ `;
 }
 
-function makeImportStatement(declare, dep, outputOptions, requestShortener) {
+function makeImportStatement(declare, dep, runtime) {
   const comment = getOptionalComment(
-    outputOptions.pathinfo,
-    requestShortener.shorten(dep.request)
+    runtime.outputOptions.pathinfo,
+    runtime.requestShortener.shorten(dep.request)
   );
   const declaration = declare ? 'var ' : '';
   const newline = declare ? '\n' : ' ';
@@ -31,14 +33,9 @@ function makeImportStatement(declare, dep, outputOptions, requestShortener) {
   return '';
 }
 
-class HarmonyImportDependencyTemplate {
-  apply(dep, source, outputOptions, requestShortener) {
-    const content = makeImportStatement(
-      true,
-      dep,
-      outputOptions,
-      requestShortener
-    );
+class HarmonyImportDependencyTemplate extends HarmonyImportDependency.Template {
+  apply(dep, source, runtime) {
+    const content = makeImportStatement(true, dep, runtime);
     source.replace(dep.range[0], dep.range[1] - 1, '');
     source.insert(-1, content);
   }

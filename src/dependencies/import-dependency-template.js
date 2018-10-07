@@ -2,14 +2,14 @@ const ImportDependency = require('webpack/lib/dependencies/ImportDependency');
 const webpackMissingPromiseModule = require('webpack/lib/dependencies/WebpackMissingModule')
   .promise;
 
-function getDepsBlockPromise(depBlock, outputOptions, requestShortener, name) {
-  if (depBlock.chunks) {
-    const chunks = depBlock.chunks.filter(
+function getDepsBlockPromise(depBlock, runtime, name) {
+  if (depBlock.chunkGroup) {
+    const chunks = depBlock.chunkGroup.chunks.filter(
       (chunk) => !chunk.hasRuntime() && chunk.id !== null
     );
-    const pathChunkCheck = outputOptions.pathinfo && depBlock.chunkName;
+    const pathChunkCheck = runtime.outputOptions.pathinfo && depBlock.chunkName;
     const shortChunkName = pathChunkCheck
-      ? `/*! ${requestShortener.shorten(depBlock.chunkName)} */`
+      ? `/*! ${runtime.requestShortener.shorten(depBlock.chunkName)} */`
       : '';
     const chunkIdsList = chunks
       .map((chunk) => JSON.stringify(chunk.id))
@@ -20,18 +20,20 @@ function getDepsBlockPromise(depBlock, outputOptions, requestShortener, name) {
   return 'Promise.resolve()';
 }
 
+function getOptionalComment(pathinfo, shortenedRequest) {
+  if (!pathinfo) {
+    return '';
+  }
+  return `/*! ${shortenedRequest} */ `;
+}
+
 class ClosureCompilerImportDependencyTemplate extends ImportDependency.Template {
-  apply(dep, source, outputOptions, requestShortener) {
+  apply(dep, source, runtime) {
     const depBlock = dep.block;
-    const promise = getDepsBlockPromise(
-      depBlock,
-      outputOptions,
-      requestShortener,
-      'import()'
-    );
-    const comment = this.getOptionalComment(
-      outputOptions.pathinfo,
-      requestShortener.shorten(dep.request)
+    const promise = getDepsBlockPromise(depBlock, runtime, 'import()');
+    const comment = getOptionalComment(
+      runtime.outputOptions.pathinfo,
+      runtime.requestShortener.shorten(dep.request)
     );
 
     const content = this.getContent(promise, dep, comment);

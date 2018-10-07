@@ -2,11 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn-dynamic-import').default;
 const walk = require('acorn/dist/walk');
-const GoogDependency = require('./goog-dependency');
-const GoogLoaderPrefixDependency = require('./goog-loader-prefix-dependency');
-const GoogLoaderSuffixDependency = require('./goog-loader-suffix-dependency');
-const GoogLoaderEs6PrefixDependency = require('./goog-loader-es6-prefix-dependency');
-const GoogLoaderEs6SuffixDependency = require('./goog-loader-es6-suffix-dependency');
+const GoogDependency = require('./dependencies/goog-dependency');
+const GoogLoaderPrefixDependency = require('./dependencies/goog-loader-prefix-dependency');
+const GoogLoaderSuffixDependency = require('./dependencies/goog-loader-suffix-dependency');
+const GoogLoaderEs6PrefixDependency = require('./dependencies/goog-loader-es6-prefix-dependency');
+const GoogLoaderEs6SuffixDependency = require('./dependencies/goog-loader-es6-suffix-dependency');
 
 class GoogRequireParserPlugin {
   constructor(options) {

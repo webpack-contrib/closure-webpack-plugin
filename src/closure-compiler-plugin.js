@@ -263,13 +263,13 @@ class ClosureCompilerPlugin {
               });
             })
             .catch((e) => {
-              console.error(e);
+              console.error(e); // eslint-disable-line no-console
             })
         );
       });
 
     compilationChain.then(() => cb()).catch((err) => {
-      console.error(err);
+      console.error(err); // eslint-disable-line no-console
       cb();
     });
   }
@@ -318,7 +318,7 @@ class ClosureCompilerPlugin {
         jsonpRuntimeRequired = true;
         parentChunkName = this.getChunkName(
           compilation,
-          chunkGroup.getParents()[0]
+          chunkGroup.getParents()[0].chunks[0]
         ).replace(/\.js$/, '');
       }
 
@@ -367,11 +367,22 @@ class ClosureCompilerPlugin {
         }
       });
     });
+
+    const sourceChunk = new Map();
     while (chunkInformation.length > 0) {
       for (let i = 0; i < chunkInformation.length; i++) {
         if (chunksAdded.has(chunkInformation[i].parentName)) {
           chunksAdded.add(chunkInformation[i].name);
-          allSources.push(...chunkInformation[i].sources);
+          if (!sourceChunk.has(chunkInformation[i].name)) {
+            sourceChunk.set(chunkInformation[i].name, new Set());
+          }
+          const sourceChunkSet = sourceChunk.get(chunkInformation[i].name);
+          for (let j = 0; j < chunkInformation[i].sources.length; j++) {
+            if (!sourceChunkSet.has(chunkInformation[i].sources[j].path)) {
+              sourceChunkSet.add(chunkInformation[i].sources[j].path);
+              allSources.push(chunkInformation[i].sources[j]);
+            }
+          }
           chunkDefs.push(chunkInformation[i].definition);
           chunkInformation.splice(i, 1);
           break;
@@ -395,7 +406,7 @@ class ClosureCompilerPlugin {
         duplicateErrors.push({
           level: 'error',
           description: `${shortSource} exists in more than one bundle.
-Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
+Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
         });
       });
       this.reportErrors(compilation, duplicateErrors);
@@ -484,7 +495,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         cb();
       })
       .catch((err) => {
-        console.error(err);
+        console.error(err); // eslint-disable-line no-console
         cb();
       });
   }
@@ -520,7 +531,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
 
         resolve(compilationResult.compiledFiles);
       }).catch((e) => {
-        console.error(e);
+        console.error(e); // eslint-disable-line no-console
         throw e;
       });
     }
@@ -623,33 +634,31 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    *
    * @param compilation
    * @param chunk
+   * @param parentChunkGroup
    * @return {string}
    */
-  getChunkFilenameTemplate(compilation, chunk) {
+  getChunkFilenameTemplate(compilation, chunk, parentChunkGroup) {
     let filenameTemplate;
     if (this.options.output) {
       let { filename } = compilation.outputOptions;
       if (this.options.output && this.options.output.filename) {
-        filename = this.options.output.filename;
+        filename = this.options.output.filename; // eslint-disable-line prefer-destructuring
       }
       let { chunkFilename } = compilation.outputOptions;
       if (this.options.output && this.options.output.chunkFilename) {
-        chunkFilename = this.options.output.chunkFilename;
+        chunkFilename = this.options.output.chunkFilename; // eslint-disable-line prefer-destructuring
       } else if (this.options.output && this.options.output.filename) {
         chunkFilename = filename;
       } else {
-        chunkFilename = compilation.outputOptions.chunkFilename;
+        chunkFilename = compilation.outputOptions.chunkFilename; // eslint-disable-line prefer-destructuring
       }
-      filenameTemplate = chunk.isInitial() ? filename : chunkFilename;
+      filenameTemplate = chunk.canBeInitial() ? filename : chunkFilename;
     } else {
       const { filename } = compilation.outputOptions;
       const { chunkFilename } = compilation.outputOptions;
       if (chunk.filenameTemplate) {
-        filenameTemplate = chunk.filenameTemplate;
-      } else if (
-        (chunk.canBeInitial && chunk.canBeInitial()) ||
-        (!chunk.canBeInitial && chunk.isInitial())
-      ) {
+        filenameTemplate = chunk.filenameTemplate; // eslint-disable-line prefer-destructuring
+      } else if (chunk.canBeInitial()) {
         filenameTemplate = filename;
       } else {
         filenameTemplate = chunkFilename;
@@ -745,113 +754,74 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
    */
   renderRuntime(compilation, chunkGroups) {
     const srcPathPerChunk = [];
-    const setChunkPath = (childChunk, parentChunk) => {
-      const filenameTemplate = this.getChunkFilenameTemplate(
+    const setChunkPath = (childChunk, parentChunkGroup) => {
+      const chunkFilename = this.getChunkFilenameTemplate(
         compilation,
-        parentChunk
+        // TODO FIX THIS
+        {}
       );
+      // TODO FIX THIS
+      const hash = '';
+      const { mainTemplate } = compilation;
       const chunkMaps = childChunk.getChunkMaps();
       const chunkIdExpression = 'chunkId';
-      let scriptSrcPath;
-      if (compilation.mainTemplate.getAssetPath) {
-        // Webpack 4+ asset path
-        scriptSrcPath = compilation.mainTemplate.getAssetPath(
-          JSON.stringify(filenameTemplate),
-          {
-            hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(
-              compilation.hash
-            )} + "`,
-            hashWithLength: (length) =>
-              `" + ${compilation.mainTemplate.renderCurrentHashCode(
-                compilation.hash,
-                length
-              )} + "`,
-            chunk: {
-              id: `" + ${chunkIdExpression} + "`,
-              hash: `" + ${JSON.stringify(
-                chunkMaps.hash
+      const scriptSrcPath = mainTemplate.getAssetPath(
+        JSON.stringify(chunkFilename),
+        {
+          hash: `" + ${mainTemplate.renderCurrentHashCode(hash)} + "`,
+          hashWithLength: (length) =>
+            `" + ${mainTemplate.renderCurrentHashCode(hash, length)} + "`,
+          chunk: {
+            id: `" + ${chunkIdExpression} + "`,
+            hash: `" + ${JSON.stringify(
+              chunkMaps.hash
+            )}[${chunkIdExpression}] + "`,
+            hashWithLength(length) {
+              const shortChunkHashMap = Object.create(null);
+              for (const chunkId of Object.keys(chunkMaps.hash)) {
+                if (typeof chunkMaps.hash[chunkId] === 'string') {
+                  shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(
+                    0,
+                    length
+                  );
+                }
+              }
+              return `" + ${JSON.stringify(
+                shortChunkHashMap
+              )}[${chunkIdExpression}] + "`;
+            },
+            name: `" + (${JSON.stringify(
+              chunkMaps.name
+            )}[${chunkIdExpression}]||${chunkIdExpression}) + "`,
+            contentHash: {
+              javascript: `" + ${JSON.stringify(
+                chunkMaps.contentHash.javascript
               )}[${chunkIdExpression}] + "`,
-              hashWithLength(length) {
-                const shortChunkHashMap = Object.create(null);
-                for (const chunkId of Object.keys(chunkMaps.hash)) {
-                  if (typeof chunkMaps.hash[chunkId] === 'string') {
-                    shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(
+            },
+            contentHashWithLength: {
+              javascript: (length) => {
+                const shortContentHashMap = {};
+                const contentHash = chunkMaps.contentHash.javascript;
+                for (const chunkId of Object.keys(contentHash)) {
+                  if (typeof contentHash[chunkId] === 'string') {
+                    shortContentHashMap[chunkId] = contentHash[chunkId].substr(
                       0,
                       length
                     );
                   }
                 }
                 return `" + ${JSON.stringify(
-                  shortChunkHashMap
+                  shortContentHashMap
                 )}[${chunkIdExpression}] + "`;
               },
-              name: `" + (${JSON.stringify(
-                chunkMaps.name
-              )}[${chunkIdExpression}]||${chunkIdExpression}) + "`,
-              contentHash: {
-                javascript: `" + ${JSON.stringify(
-                  chunkMaps.contentHash.javascript
-                )}[${chunkIdExpression}] + "`,
-              },
-              contentHashWithLength: {
-                javascript: (length) => {
-                  const shortContentHashMap = {};
-                  const contentHash = chunkMaps.contentHash.javascript;
-                  for (const chunkId of Object.keys(contentHash)) {
-                    if (typeof contentHash[chunkId] === 'string') {
-                      shortContentHashMap[chunkId] = contentHash[
-                        chunkId
-                      ].substr(0, length);
-                    }
-                  }
-                  return `" + ${JSON.stringify(
-                    shortContentHashMap
-                  )}[${chunkIdExpression}] + "`;
-                },
-              },
             },
-            contentHashType: 'javascript',
-          }
-        );
-      } else {
-        // Webpack < 4 asset path
-        scriptSrcPath = compilation.mainTemplate.applyPluginsWaterfall(
-          'asset-path',
-          JSON.stringify(filenameTemplate),
-          {
-            hash: `" + ${compilation.mainTemplate.renderCurrentHashCode(
-              compilation.hash
-            )} + "`,
-            hashWithLength: (length) =>
-              `" + ${compilation.mainTemplate.renderCurrentHashCode(
-                compilation.hash,
-                length
-              )} + "`,
-            chunk: {
-              id: `${parentChunk.id}`,
-              hash: chunkMaps[parentChunk.id] || parentChunk.hash,
-              hashWithLength(length) {
-                const shortChunkHashMap = Object.create(null);
-                Object.keys(chunkMaps.hash).forEach((chunkId) => {
-                  if (typeof chunkMaps.hash[chunkId] === 'string') {
-                    shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(
-                      0,
-                      length
-                    );
-                  }
-                });
-                return (
-                  shortChunkHashMap[parentChunk.id] ||
-                  parentChunk.hash.substr(0, length)
-                );
-              },
-              name: parentChunk.name || parentChunk.id,
-            },
-          }
-        );
-      }
+          },
+          contentHashType: 'javascript',
+        }
+      );
+
       srcPathPerChunk.push(
-        `_WEBPACK_SOURCE_[${parentChunk.id}] = ${scriptSrcPath}`
+        `_WEBPACK_SOURCE_[${parentChunkGroup.id}] = ${scriptSrcPath}`
       );
     };
 

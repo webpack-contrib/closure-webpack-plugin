@@ -244,10 +244,7 @@ class ClosureCompilerPlugin {
                 } else {
                   assetName = outputFile.path.replace(/^\.\//, '');
                   if (!/\.js$/.test(matchingChunk.files[0])) {
-                    assetName = outputFile.path.substr(
-                      0,
-                      outputFile.path.length - 3
-                    );
+                    assetName = assetName.substr(0, assetName.length - 3);
                   }
                 }
                 const sourceMap = JSON.parse(outputFile.source_map);

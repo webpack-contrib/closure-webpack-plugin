@@ -8,13 +8,14 @@
     "start:devserver": "webpack-dev-server",
     "build": "run-s build:deps build:webpack",
     "build:webpack": "webpack -p --env production",
-    "build:deps": "./node_modules/google-closure-library/closure/bin/build/depswriter.py --root_with_prefix 'src ../../../../src' > public/deps.js",
+    "build:deps": "./node_modules/google-closure-deps/bin/closuremakedeps.js --no-validate --root src --closure-path './node_modules/google-closure-library/closure/goog' > public/deps.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "koba04",
   "license": "MIT",
   "dependencies": {
+    "google-closure-deps": "^20180910.1.0",
     "google-closure-library": "^20180805.0.0",
     "object-assign": "^4.1.1"
   },

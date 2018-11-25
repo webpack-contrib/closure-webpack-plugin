@@ -296,7 +296,7 @@ class ClosureCompilerPlugin {
 
     const BASE_CHUNK_NAME = 'required-base';
     const entryChunkWrapper =
-      'var __wpcc;if(typeof __wpcc === "undefined")__wpcc={};(function(__wpcc){%s}).call(this || window, __wpcc);';
+      '(function(__wpcc){%s}).call(this || window, (window.__wpcc = window.__wpcc || {}));';
     const chunkDefs = [`${BASE_CHUNK_NAME}:${baseChunkSourceCount}`];
     let uniqueId = 1;
     let jsonpRuntimeRequired = false;

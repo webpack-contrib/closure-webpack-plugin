@@ -34,7 +34,7 @@ function makeImportStatement(declare, dep, runtime) {
 }
 
 class HarmonyImportDependencyTemplate extends HarmonyImportDependency.Template {
-  apply(dep, source, runtime) {
+  harmonyInit(dep, source, runtime, dependencyTemplates) {
     const content = makeImportStatement(true, dep, runtime);
     source.replace(dep.range[0], dep.range[1] - 1, '');
     source.insert(-1, content);

@@ -1,6 +1,10 @@
 const toSafePath = require('./safe-path');
 
-module.exports = function getChunkSources(chunk, getUniqueId) {
+module.exports = function getChunkSources(
+  chunk,
+  getUniqueId,
+  dependencyTemplates
+) {
   if (chunk.isEmpty()) {
     return [
       {
@@ -19,7 +23,9 @@ module.exports = function getChunkSources(chunk, getUniqueId) {
       let src = '';
       let sourceMap = null;
       try {
-        const souceAndMap = webpackModule.source().sourceAndMap();
+        const souceAndMap = webpackModule
+          .source(dependencyTemplates)
+          .sourceAndMap();
         src = souceAndMap.source;
         if (souceAndMap.map) {
           sourceMap = JSON.stringify(souceAndMap.map);

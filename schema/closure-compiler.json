@@ -5,6 +5,16 @@
     "platform": {
       "type": "string",
       "enum": ["java", "javascript", "native"]
+    },
+    "file-conditions": {
+      "anyOf": [
+        {
+          "instanceof": "RegExp"
+        },
+        {
+          "type": "string"
+        }
+      ]
     }
   },
   "properties": {
@@ -48,6 +58,57 @@
           "$ref": "#/definitions/platform"
         }
       }]
+    },
+    "test": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/file-conditions"
+        },
+        {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/file-conditions"
+              }
+            ]
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "include": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/file-conditions"
+        },
+        {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/file-conditions"
+              }
+            ]
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "exclude": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/file-conditions"
+        },
+        {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/file-conditions"
+              }
+            ]
+          },
+          "type": "array"
+        }
+      ]
     }
   }
 }

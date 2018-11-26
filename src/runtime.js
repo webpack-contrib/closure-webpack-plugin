@@ -130,3 +130,12 @@ __webpack_require__.oe = function(err) {
   console.error(err); // eslint-disable-line no-console
   throw err;
 };
+
+/**
+ * Register a new child chunk path
+ * @param {string} childChunkId
+ * @param {string} childChunkPath
+ */
+__webpack_require__.z = function(childChunkId, childChunkPath) {
+  _WEBPACK_SOURCE_[childChunkId] = childChunkPath;
+};

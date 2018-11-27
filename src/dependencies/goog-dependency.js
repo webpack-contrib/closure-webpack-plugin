@@ -1,9 +1,10 @@
 const ModuleDependency = require('webpack/lib/dependencies/ModuleDependency');
 
 class GoogDependency extends ModuleDependency {
-  constructor(request, insertPosition) {
+  constructor(request, insertPosition, isBase = false) {
     super(request);
     this.insertPosition = insertPosition;
+    this.isBase = isBase;
   }
 
   get type() {
@@ -17,7 +18,10 @@ class GoogDependencyTemplate {
       return;
     }
 
-    const content = `__webpack_require__(${JSON.stringify(dep.module.id)});`;
+    let content = `__webpack_require__(${JSON.stringify(dep.module.id)});\n`;
+    if (dep.isBase) {
+      content = `var goog = ${content}`;
+    }
     source.insert(dep.insertPosition, content);
   }
 }

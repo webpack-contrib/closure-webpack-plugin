@@ -18,14 +18,12 @@ class GoogLoaderPrefixDependencyTemplate {
       return;
     }
 
-    let content = `var googPreviousLoaderState__ = goog.moduleLoaderState_;`;
+    let content = `var googPreviousLoaderState__ = goog.moduleLoaderState_;\n`;
     if (dep.isGoogModule) {
-      content += `
-goog.moduleLoaderState_ = {moduleName: '', declareLegacyNamespace: false};
-goog.loadModule(function() {`;
+      content += `goog.moduleLoaderState_ = {moduleName: '', declareLegacyNamespace: false};
+goog.loadModule(function() {\n`;
     } else {
-      content += `
-goog.moduleLoaderState_ = null;`;
+      content += `goog.moduleLoaderState_ = null;\n`;
     }
     source.insert(dep.insertPosition, content);
   }

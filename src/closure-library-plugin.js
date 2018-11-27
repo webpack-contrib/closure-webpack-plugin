@@ -11,6 +11,7 @@
 const RequestShortener = require('webpack/lib/RequestShortener');
 const GoogRequireParserPlugin = require('./goog-require-parser-plugin');
 const GoogDependency = require('./dependencies/goog-dependency');
+const GoogBaseGlobalDependency = require('./dependencies/goog-base-global');
 const GoogLoaderPrefixDependency = require('./dependencies/goog-loader-prefix-dependency');
 const GoogLoaderSuffixDependency = require('./dependencies/goog-loader-suffix-dependency');
 const GoogLoaderEs6PrefixDependency = require('./dependencies/goog-loader-es6-prefix-dependency');
@@ -44,13 +45,27 @@ class ClosureLibraryPlugin {
       this.options.closureLibraryBase &&
       (this.options.deps || this.options.extraDeps)
     ) {
-      const parserPluginOptions = Object.assign({}, this.options);
+      const parserPluginOptions = Object.assign(
+        { mode: compilation.options.mode },
+        this.options
+      );
 
       const { normalModuleFactory } = params;
 
-      normalModuleFactory.hooks.parser.tap(PLUGIN, (parser) => {
-        parser.apply(new GoogRequireParserPlugin(parserPluginOptions));
-      });
+      const parserCallback = (parser) => {
+        const parserPlugin = new GoogRequireParserPlugin(parserPluginOptions);
+        parserPlugin.apply(parser);
+      };
+
+      normalModuleFactory.hooks.parser
+        .for('javascript/auto')
+        .tap(PLUGIN.name, parserCallback);
+      normalModuleFactory.hooks.parser
+        .for('javascript/dynamic')
+        .tap(PLUGIN.name, parserCallback);
+      normalModuleFactory.hooks.parser
+        .for('javascript/esm')
+        .tap(PLUGIN.name, parserCallback);
 
       compilation.dependencyFactories.set(
         GoogDependency,
@@ -59,6 +74,14 @@ class ClosureLibraryPlugin {
       compilation.dependencyTemplates.set(
         GoogDependency,
         new GoogDependency.Template()
+      );
+      compilation.dependencyFactories.set(
+        GoogBaseGlobalDependency,
+        params.normalModuleFactory
+      );
+      compilation.dependencyTemplates.set(
+        GoogBaseGlobalDependency,
+        new GoogBaseGlobalDependency.Template()
       );
       compilation.dependencyFactories.set(
         GoogLoaderPrefixDependency,

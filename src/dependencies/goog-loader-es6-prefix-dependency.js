@@ -34,9 +34,8 @@ class GoogLoaderEs6PrefixDependencyTemplate {
 
     source.insert(
       dep.insertPosition,
-      '$jscomp.getCurrentModulePath = function() { return ' +
-        "'<webpack module>'; };" +
-        '$jscomp.require = function() { return __webpack_exports__ };'
+      `$jscomp.getCurrentModulePath = function() { return '<webpack module>'; };\n` +
+        '$jscomp.require = function() { return __webpack_exports__ };\n'
     );
   }
 }

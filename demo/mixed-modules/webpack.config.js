@@ -1,9 +1,8 @@
-const webpack = require('webpack');
 const path = require('path');
-const ClosurePlugin = require('../../src/index');
+const ClosureCompilerPlugin = require('../../src/closure-compiler-plugin');
 
-module.exports = (env) => {
-  const isProduction = env === 'production';
+module.exports = (env, argv) => {
+  const isProduction = argv.mode === 'production';
 
   const compilerFlags = isProduction
     ? {
@@ -26,10 +25,21 @@ module.exports = (env) => {
       open: true,
       contentBase: path.resolve(__dirname, 'public'),
     },
+    devtool: 'source-map',
+    optimization: {
+      minimize: isProduction,
+      minimizer: [
+        new ClosureCompilerPlugin(
+          {
+            mode: isProduction ? 'AGGRESSIVE_BUNDLE' : 'NONE',
+          },
+          compilerFlags
+        )
+      ]
+    },
     plugins: [
-      new ClosurePlugin(
+      new ClosureCompilerPlugin.LibraryPlugin(
         {
-          mode: isProduction ? 'AGGRESSIVE_BUNDLE' : 'NONE',
           closureLibraryBase: require.resolve(
             'google-closure-library/closure/goog/base'
           ),
@@ -39,7 +49,7 @@ module.exports = (env) => {
           ],
         },
         compilerFlags
-      ),
-    ],
+      )
+    ]
   };
 };

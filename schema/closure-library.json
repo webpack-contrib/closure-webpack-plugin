@@ -1,6 +1,12 @@
 {
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "modes": {
+      "type": "string",
+      "enum": ["development", "production"]
+    }
+  },
   "properties": {
     "closureLibraryBase": {
       "description": "Path to Closure-Library's base.js file",
@@ -16,6 +22,9 @@
     "extraDeps": {
       "description": "A map of name to path of additional closure-library style dependencies",
       "type": "object"
+    },
+    "mode": {
+      "$ref": "#/definitions/modes"
     }
   }
 }

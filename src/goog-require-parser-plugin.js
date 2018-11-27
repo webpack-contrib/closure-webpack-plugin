@@ -3,10 +3,16 @@ const path = require('path');
 const acorn = require('acorn-dynamic-import').default;
 const walk = require('acorn/dist/walk');
 const GoogDependency = require('./dependencies/goog-dependency');
+const GoogBaseGlobalDependency = require('./dependencies/goog-base-global');
 const GoogLoaderPrefixDependency = require('./dependencies/goog-loader-prefix-dependency');
 const GoogLoaderSuffixDependency = require('./dependencies/goog-loader-suffix-dependency');
 const GoogLoaderEs6PrefixDependency = require('./dependencies/goog-loader-es6-prefix-dependency');
 const GoogLoaderEs6SuffixDependency = require('./dependencies/goog-loader-es6-suffix-dependency');
+
+const PLUGIN = { name: 'ClosureLibraryPlugin' };
+
+const isProductionLikeMode = (options) =>
+  options.mode === 'production' || !options.mode;
 
 class GoogRequireParserPlugin {
   constructor(options) {
@@ -72,19 +78,19 @@ class GoogRequireParserPlugin {
   }
 
   apply(parser) {
-    parser.plugin(['call goog.require', 'call goog.provide'], (expr) => {
+    const googRequireProvideCallback = (expr) => {
       if (
         !parser.state.current.hasDependencies(
           (dep) => dep.request === this.basePath
         )
       ) {
-        this.addGoogDependency(parser, this.basePath);
+        this.addGoogDependency(parser, this.basePath, true);
       }
 
       // For goog.provide calls, add loader code and exit
       if (expr.callee.property.name === 'provide') {
         if (
-          this.options.mode === 'NONE' &&
+          !isProductionLikeMode(this.options) &&
           !parser.state.current.dependencies.find(
             (dep) => dep instanceof GoogLoaderPrefixDependency
           )
@@ -108,11 +114,17 @@ class GoogRequireParserPlugin {
         parser.state.compilation.errors.push(e);
       }
       return false;
-    });
+    };
+    parser.hooks.call
+      .for('goog.require')
+      .tap(PLUGIN, googRequireProvideCallback);
+    parser.hooks.call
+      .for('goog.provide')
+      .tap(PLUGIN, googRequireProvideCallback);
 
     // When closure-compiler is not bundling the output, shim base.js of closure-library
-    if (this.options.mode === 'NONE') {
-      parser.plugin('statement', (expr) => {
+    if (!isProductionLikeMode(this.options)) {
+      parser.hooks.statement.tap(PLUGIN, (expr) => {
         if (
           expr.type === 'VariableDeclaration' &&
           expr.declarations.length === 1 &&
@@ -127,24 +139,11 @@ class GoogRequireParserPlugin {
           parser.state.current.contextArgument = function() {
             return 'window';
           };
-          const {
-            variableInjectionFunctionWrapperEndCode,
-          } = parser.state.current;
-          parser.state.current.variableInjectionFunctionWrapperEndCode = function(
-            varExpressions,
-            block
-          ) {
-            const wrapperEndCode = variableInjectionFunctionWrapperEndCode.call(
-              this,
-              varExpressions,
-              block
-            );
-            return `goog.ENABLE_DEBUG_LOADER = false; window.goog = goog;${wrapperEndCode}`;
-          };
+          parser.state.current.addDependency(new GoogBaseGlobalDependency());
         }
       });
-      parser.plugin('call goog.module', (expr) => {
-        if (this.options.mode === 'NONE') {
+      parser.hooks.call.for('goog.module').tap(PLUGIN, (expr) => {
+        if (!isProductionLikeMode(this.options)) {
           if (
             !parser.state.current.hasDependencies(
               (dep) => dep.request === this.basePath
@@ -167,7 +166,7 @@ class GoogRequireParserPlugin {
           }
         }
       });
-      parser.plugin('call goog.module.declareNamespace', () => {
+      const googModuleDeclareCallback = () => {
         if (
           !parser.state.current.hasDependencies(
             (dep) => dep.request === this.basePath
@@ -183,8 +182,15 @@ class GoogRequireParserPlugin {
         );
 
         this.addEs6LoaderDependency(parser);
-      });
-      parser.plugin('import', () => {
+      };
+      parser.hooks.call
+        .for('goog.module.declareNamespace')
+        .tap(PLUGIN, googModuleDeclareCallback);
+      parser.hooks.call
+        .for('goog.declareModuleId')
+        .tap(PLUGIN, googModuleDeclareCallback);
+
+      parser.hooks.import.tap(PLUGIN, () => {
         parser.state.current.addVariable(
           '$jscomp',
           'window.$jscomp = window.$jscomp || {}',
@@ -192,7 +198,7 @@ class GoogRequireParserPlugin {
         );
         this.addEs6LoaderDependency(parser);
       });
-      parser.plugin('export', () => {
+      parser.hooks.export.tap(PLUGIN, () => {
         parser.state.current.addVariable(
           '$jscomp',
           'window.$jscomp = window.$jscomp || {}',
@@ -203,12 +209,12 @@ class GoogRequireParserPlugin {
     }
   }
 
-  addGoogDependency(parser, request) {
+  addGoogDependency(parser, request, addAsBaseJs) {
     // ES6 prefixing must happen after all requires have loaded otherwise
     // Closure library can think an ES6 module is calling goog.provide/module.
-    const baseInsertPos = this.options.mode === 'NONE' ? -1 : null;
+    const baseInsertPos = !isProductionLikeMode(this.options) ? -1 : null;
     parser.state.current.addDependency(
-      new GoogDependency(request, baseInsertPos)
+      new GoogDependency(request, baseInsertPos, addAsBaseJs)
     );
   }
 
@@ -233,11 +239,10 @@ class GoogRequireParserPlugin {
 
     // ES6 prefixing must happen after all requires have loaded otherwise
     // Closure library can think an ES6 module is calling goog.provide/module.
-    const baseInsertPos = this.options.mode === 'NONE' ? 0 : null;
-    const sourceLength =
-      this.options.mode === 'NONE'
-        ? parser.state.current._source.source().length
-        : null;
+    const baseInsertPos = !isProductionLikeMode(this.options) ? 0 : null;
+    const sourceLength = !isProductionLikeMode(this.options)
+      ? parser.state.current._source.source().length
+      : null;
     parser.state.current.addDependency(
       new GoogLoaderEs6PrefixDependency(baseInsertPos)
     );

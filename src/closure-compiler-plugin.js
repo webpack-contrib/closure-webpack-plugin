@@ -98,6 +98,9 @@ class ClosureCompilerPlugin {
     }
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
+      // The concatenated modules plugin is not compatible with this mode
+      compilation.options.optimization.concatenateModules = false;
+
       // It's very difficult to override a specific dependency template without rewriting the entire set.
       // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
       Promise.resolve().then(() => {
@@ -310,7 +313,7 @@ class ClosureCompilerPlugin {
     originalChunks.forEach((chunk) => {
       let isEntrypoint = false;
       let parentChunkNames;
-      if (chunk.canBeInitial()) {
+      if (chunk.hasEntryModule()) {
         isEntrypoint = true;
         parentChunkNames = [BASE_CHUNK_NAME];
       } else {
@@ -340,7 +343,8 @@ class ClosureCompilerPlugin {
         chunkSources,
         parentChunkNames,
         chunkDefs_,
-        uniqueId
+        uniqueId,
+        entrypoints
       );
       const chunkName = this.getChunkName(compilation, chunk).replace(
         /\.js$/,
@@ -348,14 +352,16 @@ class ClosureCompilerPlugin {
       );
       if (isEntrypoint) {
         if (chunk.hasEntryModule()) {
-          if (chunk.entryModule.userRequest) {
-            entrypoints.push(toSafePath(chunk.entryModule.userRequest));
-          } else {
-            chunk.entryModule.dependencies.forEach((dep) => {
-              if (dep.module && dep.module.userRequest) {
-                entrypoints.push(toSafePath(dep.module.userRequest));
-              }
-            });
+          if (
+            chunk.entryModule.userRequest ||
+            chunk.entryModule.rootModule.userRequest
+          ) {
+            entrypoints.push(
+              toSafePath(
+                chunk.entryModule.userRequest ||
+                  chunk.entryModule.rootModule.userRequest
+              )
+            );
           }
         }
 
@@ -667,13 +673,13 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
       } else {
         chunkFilename = compilation.outputOptions.chunkFilename; // eslint-disable-line prefer-destructuring
       }
-      filenameTemplate = chunk.canBeInitial() ? filename : chunkFilename;
+      filenameTemplate = chunk.hasEntryModule() ? filename : chunkFilename;
     } else {
       const { filename } = compilation.outputOptions;
       const { chunkFilename } = compilation.outputOptions;
       if (chunk.filenameTemplate) {
         filenameTemplate = chunk.filenameTemplate; // eslint-disable-line prefer-destructuring
-      } else if (chunk.canBeInitial()) {
+      } else if (chunk.hasEntryModule()) {
         filenameTemplate = filename;
       } else {
         filenameTemplate = chunkFilename;
@@ -691,7 +697,7 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
   getChunkName(compilation, chunk) {
     const filenameTemplate = this.getChunkFilenameTemplate(compilation, chunk);
     const useChunkHash =
-      !chunk.canBeInitial() ||
+      !chunk.hasEntryModule() ||
       (compilation.mainTemplate.useChunkHash &&
         compilation.mainTemplate.useChunkHash(chunk));
     return compilation.getPath(filenameTemplate, {
@@ -710,6 +716,7 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
    * @param {!Array<string>} parentChunkNames - logical chunk parent of this tree
    * @param {!Array<string>} chunkDefs - closure compiler chunk definitions (chunkName:parentName)
    * @param {number} nextUniqueId
+   * @param {!Array<string>} entrypoint modules
    * @return {number} next safe unique id
    */
   addChunkToCompilation(
@@ -718,7 +725,8 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
     sources,
     parentChunkNames,
     chunkDefs,
-    nextUniqueId
+    nextUniqueId,
+    entrypoints
   ) {
     const chunkName = this.getChunkName(compilation, chunk);
     const chunkSources = [];
@@ -734,15 +742,18 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
           compilation,
           this.getChunkFilenameTemplate(compilation, chunk)
         );
-        chunkSources.push({
+        const childModulePathRegistrationSource = {
           path: path.resolve('.', `__webpack_register_source_${chunk.id}__.js`),
           src:
             '(function(chunkIds){\n' +
-            '  for (var i = 0; i < chunkIds.length; i++) {\n' +
-            `    __webpack_require__.z(chunkIds[i], ${childChunkPaths});\n` +
+            '  for (var i = 0, chunkId; i < chunkIds.length; i++) {\n' +
+            '    chunkId = chunkIds[i];\n' +
+            `    __webpack_require__.rs(chunkIds[i], ${childChunkPaths});\n` +
             '  }\n' +
             `})(${JSON.stringify(childChunkIds)});`,
-        });
+        };
+        chunkSources.push(childModulePathRegistrationSource);
+        entrypoints.push(childModulePathRegistrationSource.path);
       }
       chunkSources.push(
         ...getChunkSources(
@@ -752,7 +763,8 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
             nextUniqueId += 1;
             return newId;
           },
-          compilation.dependencyTemplates
+          compilation.dependencyTemplates,
+          compilation.runtimeTemplate
         )
       );
     } else {

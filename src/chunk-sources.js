@@ -3,7 +3,8 @@ const toSafePath = require('./safe-path');
 module.exports = function getChunkSources(
   chunk,
   getUniqueId,
-  dependencyTemplates
+  dependencyTemplates,
+  runtimeTemplate
 ) {
   if (chunk.isEmpty()) {
     return [
@@ -13,32 +14,51 @@ module.exports = function getChunkSources(
       },
     ];
   }
+
+  const getModuleSrcObject = (webpackModule) => {
+    let path =
+      webpackModule.userRequest || webpackModule.rootModule.userRequest;
+    if (!path) {
+      path = `__unknown_${getUniqueId()}__`;
+    }
+    let src = '';
+    let sourceMap = null;
+    try {
+      const souceAndMap = webpackModule
+        .source(dependencyTemplates, runtimeTemplate)
+        .sourceAndMap();
+      src = souceAndMap.source;
+      if (souceAndMap.map) {
+        sourceMap = JSON.stringify(souceAndMap.map);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    return {
+      path: toSafePath(path),
+      src,
+      sourceMap,
+      webpackId: webpackModule.id ? `${webpackModule.id}` : webpackModule.id,
+    };
+  };
+
   return chunk
     .getModules()
-    .map((webpackModule) => {
-      let path = webpackModule.userRequest;
-      if (!path) {
-        path = `__unknown_${getUniqueId()}__`;
+    .reduce((modules, webpackModule) => {
+      if (webpackModule.userRequest || webpackModule.rootModule.userRequest) {
+        modules.push(getModuleSrcObject(webpackModule));
+      } else if (webpackModule.modules) {
+        modules.push(
+          ...webpackModule.modules.map((concatenatedModule) =>
+            getModuleSrcObject(concatenatedModule)
+          )
+        );
+      } else {
+        modules.push(getModuleSrcObject(webpackModule));
       }
-      let src = '';
-      let sourceMap = null;
-      try {
-        const souceAndMap = webpackModule
-          .source(dependencyTemplates)
-          .sourceAndMap();
-        src = souceAndMap.source;
-        if (souceAndMap.map) {
-          sourceMap = JSON.stringify(souceAndMap.map);
-        }
-      } catch (e) {}
-
-      return {
-        path: toSafePath(path),
-        src,
-        sourceMap,
-        webpackId: `${webpackModule.id}`,
-      };
-    })
+      return modules;
+    }, [])
     .filter(
       (moduleJson) =>
         !(

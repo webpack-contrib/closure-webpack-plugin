@@ -2,11 +2,13 @@ const path = require('path');
 const ClosureCompilerPlugin = require('../../src/closure-compiler-plugin');
 
 module.exports = (env, argv) => {
-  const isProduction = argv.mode === 'production';
+  const isProduction = argv.mode === 'production' || !argv.mode;
 
   const compilerFlags = isProduction
     ? {
-        compilation_level: 'ADVANCED',
+        compilation_level: 'SIMPLE',
+        formatting: 'PRETTY_PRINT',
+        renaming: false
       }
     : {
         formatting: 'PRETTY_PRINT',
@@ -15,7 +17,7 @@ module.exports = (env, argv) => {
 
   return {
     entry: {
-      app: './src/app.js',
+      // app: './src/app.js',
       'commonjs-lazy': './src/commonjs-lazy.js',
       'es6-lazy': './src/es6-lazy.js'
     },
@@ -26,6 +28,7 @@ module.exports = (env, argv) => {
     devServer: {
       open: true,
       contentBase: path.resolve(__dirname, 'public'),
+      inline: !isProduction
     },
     devtool: 'source-map',
     optimization: {
@@ -37,7 +40,10 @@ module.exports = (env, argv) => {
           },
           compilerFlags
         )
-      ]
+      ],
+      splitChunks: {
+        minSize: 0
+      }
     },
     plugins: [
       new ClosureCompilerPlugin.LibraryPlugin(

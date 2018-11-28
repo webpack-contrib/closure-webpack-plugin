@@ -16,10 +16,12 @@ module.exports = (env, argv) => {
   return {
     entry: {
       app: './src/app.js',
+      'commonjs-lazy': './src/commonjs-lazy.js',
+      'es6-lazy': './src/es6-lazy.js'
     },
     output: {
       path: path.resolve(__dirname, 'public'),
-      filename: 'app.js',
+      filename: '[name].js',
     },
     devServer: {
       open: true,

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "run-s build:deps start:devserver",
-    "start:devserver": "webpack-dev-server --mode=development",
+    "start:devserver": "webpack-dev-server",
     "build": "run-s build:deps build:webpack",
     "build:webpack": "webpack -p --mode=production",
     "build:deps": "./node_modules/google-closure-library/closure/bin/build/depswriter.py --root_with_prefix 'src ../../../../src' > public/deps.js",

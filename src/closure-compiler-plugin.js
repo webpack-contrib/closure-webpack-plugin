@@ -18,6 +18,19 @@ const toSafePath = require('./safe-path');
 const getChunkSources = require('./chunk-sources');
 const ClosureLibraryPlugin = require('./closure-library-plugin');
 
+const ENTRY_CHUNK_WRAPPER =
+  '(function(__wpcc){%s}).call(this || window, (window.__wpcc = window.__wpcc || {}));';
+
+/**
+ * @typedef {Map<string, {
+ *   name:string,
+ *   parentNames:!Set<string>,
+ *   sources: !Array<{path: string, source: string: sourceMap: string}>,
+ *   outputWrapper: (string|undefined)
+ * }>}
+ */
+var ChunkMap;
+
 function findChunkFile(chunk, chunkId, outputFilePath) {
   for (let i = 0; i < chunk.files.length; i++) {
     const chunkFile = chunk.files[i];
@@ -177,106 +190,80 @@ class ClosureCompilerPlugin {
   standardBundle(compilation, originalChunks, cb) {
     let uniqueId = 1;
     let compilationChain = Promise.resolve();
-    const { chunkGroups } = compilation;
-
-    chunkGroups
-      .filter((chunkGroup) => chunkGroup.isInitial())
-      .forEach((entrypoint) => {
-        const chunkDefs = [];
-        const sources = [];
-        const addGroupChunksToCompilation = (chunkGroup) => {
-          let parentChunkName = null;
-          if (!chunkGroup.isInitial()) {
-            parentChunkName = this.getChunkName(
-              compilation,
-              chunkGroup.getParents()[0].chunks[0],
-              chunkGroup.getParents()[0]
-            ).replace(/\.js$/, '');
-          }
-          chunkGroup.chunks.forEach((chunk) => {
-            uniqueId += this.addChunkToCompilation(
-              compilation,
-              chunk,
-              sources,
-              parentChunkName,
-              chunkDefs,
-              uniqueId
-            );
-          });
-          chunkGroup
-            .getChildren()
-            .forEach((childChunkGroup) =>
-              addGroupChunksToCompilation(childChunkGroup)
-            );
-        };
-        addGroupChunksToCompilation(entrypoint);
-
-        const compilationOptions = Object.assign({}, this.compilerFlags, {
-          chunk: chunkDefs,
-        });
-
-        let externs = [];
-
-        externs.push(require.resolve('./standard-externs.js'));
-
-        if (Array.isArray(compilationOptions.externs)) {
-          externs = externs.concat(compilationOptions.externs);
-        } else if (compilationOptions.externs != null) {
-          externs.push(compilationOptions.externs);
-        }
-
-        compilationOptions.externs = externs;
-
-        compilationChain = compilationChain.then(() =>
-          this.runCompiler(compilation, compilationOptions, sources)
-            .then((outputFiles) => {
-              outputFiles.forEach((outputFile) => {
-                const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
-                let chunkId;
-                if (chunkIdParts) {
-                  chunkId = parseInt(chunkIdParts[1], 10);
-                }
-                const matchingChunk = compilation.chunks.find((chunk_) =>
-                  findChunkFile(chunk_, chunkId, outputFile.path)
-                );
-                if (!matchingChunk) {
-                  return;
-                }
-                let assetName;
-                if (chunkIdParts) {
-                  [assetName] = matchingChunk.files;
-                } else {
-                  assetName = outputFile.path.replace(/^\.\//, '');
-                  if (!/\.js$/.test(matchingChunk.files[0])) {
-                    assetName = assetName.substr(0, assetName.length - 3);
-                  }
-                }
-                const sourceMap = JSON.parse(outputFile.source_map);
-                sourceMap.file = assetName;
-                const source = outputFile.src;
-                compilation.assets[assetName] = new SourceMapSource(
-                  source,
-                  assetName,
-                  sourceMap,
-                  null,
-                  null
-                );
-              });
-            })
-            .catch((e) => {
-              if (e) {
-                console.error(e); // eslint-disable-line no-console
-              }
-            })
-        );
-      });
-
-    compilationChain.then(() => cb()).catch((err) => {
-      if (err) {
-        console.error(err); // eslint-disable-line no-console
+    originalChunks.forEach((chunk) => {
+      if (!chunk.hasEntryModule()) {
+        return;
       }
-      cb();
+      const chunkDefs = new Map();
+      const entrypoints = [];
+      uniqueId += this.addChunkToCompilationStandard(
+        compilation,
+        chunk,
+        null,
+        chunkDefs,
+        uniqueId,
+        entrypoints
+      );
+      const sources = [];
+      const compilationOptions = this.buildCompilerOptions(
+        chunkDefs,
+        entrypoints,
+        this.compilerFlags.defines || [],
+        sources
+      );
+
+      let externs = [];
+      externs.push(require.resolve('./standard-externs.js'));
+      if (Array.isArray(compilationOptions.externs)) {
+        externs = externs.concat(compilationOptions.externs);
+      } else if (compilationOptions.externs != null) {
+        externs.push(compilationOptions.externs);
+      }
+      compilationOptions.externs = externs;
+
+      compilationChain = compilationChain.then(() =>
+        this.runCompiler(compilation, compilationOptions, sources)
+          .then((outputFiles) => {
+            outputFiles.forEach((outputFile) => {
+              const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
+              let chunkId;
+              if (chunkIdParts) {
+                chunkId = parseInt(chunkIdParts[1], 10);
+              }
+              const matchingChunk = compilation.chunks.find((chunk_) =>
+                findChunkFile(chunk_, chunkId, outputFile.path)
+              );
+              if (!matchingChunk) {
+                return;
+              }
+              let assetName;
+              if (chunkIdParts) {
+                assetName = chunk.files[0];
+              } else {
+                assetName = outputFile.path.replace(/^\.\//, '');
+                if (!/\.js$/.test(chunk.files[0])) {
+                  assetName = assetName.substr(0, assetName.length - 3);
+                }
+              }
+              const sourceMap = JSON.parse(outputFile.source_map);
+              sourceMap.file = assetName;
+              const source = outputFile.src;
+              compilation.assets[assetName] = new SourceMapSource(
+                source,
+                assetName,
+                sourceMap,
+                null,
+                null
+              );
+            });
+          })
+          .catch((e) => {
+            console.error(e);
+          })
+      );
     });
+
+    compilationChain.then(() => cb()).catch(() => cb());
   }
 
   /**
@@ -287,35 +274,50 @@ class ClosureCompilerPlugin {
   aggressiveBundle(compilation, originalChunks, cb) {
     const basicRuntimePath = require.resolve('./basic-runtime.js');
     const externsPath = require.resolve('./aggressive-bundle-externs.js');
-    const allSources = [
-      {
-        path: externsPath,
-        src: fs.readFileSync(externsPath, 'utf8'),
-      },
-      {
-        path: basicRuntimePath,
-        src: fs.readFileSync(basicRuntimePath, 'utf8'),
-      },
-    ];
 
-    let baseChunkSourceCount = allSources.length;
     const BASE_CHUNK_NAME = 'required-base';
-    const entryChunkWrapper =
-      '(function(__wpcc){%s}).call(this || window, (window.__wpcc = window.__wpcc || {}));';
-    const chunkDefs = [`${BASE_CHUNK_NAME}:${baseChunkSourceCount}`];
+    /** @type {!ChunkMap} */
+    const chunkDefs = new Map([
+      [
+        BASE_CHUNK_NAME,
+        {
+          name: BASE_CHUNK_NAME,
+          parentNames: new Set(),
+          sources: [
+            {
+              path: externsPath,
+              src: fs.readFileSync(externsPath, 'utf8'),
+            },
+            {
+              path: basicRuntimePath,
+              src: fs.readFileSync(basicRuntimePath, 'utf8'),
+            },
+          ],
+          outputWrapper: ENTRY_CHUNK_WRAPPER,
+        },
+      ],
+    ]);
     let uniqueId = 1;
     let jsonpRuntimeRequired = false;
-    const entrypoints = allSources.slice(1).map((source) => source.path);
-    const chunkWrappers = [`${BASE_CHUNK_NAME}:${entryChunkWrapper}`];
-
-    const chunkInformation = [];
-    const chunksAdded = new Set();
+    const entrypoints = chunkDefs
+      .get(BASE_CHUNK_NAME)
+      .sources.slice(1)
+      .map((source) => source.path);
     originalChunks.forEach((chunk) => {
-      let isEntrypoint = false;
       let parentChunkNames;
       if (chunk.hasEntryModule()) {
-        isEntrypoint = true;
         parentChunkNames = [BASE_CHUNK_NAME];
+        if (
+          chunk.entryModule.userRequest ||
+          chunk.entryModule.rootModule.userRequest
+        ) {
+          entrypoints.push(
+            toSafePath(
+              chunk.entryModule.userRequest ||
+                chunk.entryModule.rootModule.userRequest
+            )
+          );
+        }
       } else {
         jsonpRuntimeRequired = true;
         parentChunkNames = compilation.chunkGroups
@@ -335,113 +337,21 @@ class ClosureCompilerPlugin {
           );
       }
 
-      const chunkSources = [];
-      const chunkDefs_ = [];
-      uniqueId += this.addChunkToCompilation(
+      uniqueId += this.addChunkToCompilationAggressive(
         compilation,
         chunk,
-        chunkSources,
         parentChunkNames,
-        chunkDefs_,
+        chunkDefs,
         uniqueId,
         entrypoints
       );
-      const chunkName = this.getChunkName(compilation, chunk).replace(
-        /\.js$/,
-        ''
-      );
-      if (isEntrypoint) {
-        if (chunk.hasEntryModule()) {
-          if (
-            chunk.entryModule.userRequest ||
-            chunk.entryModule.rootModule.userRequest
-          ) {
-            entrypoints.push(
-              toSafePath(
-                chunk.entryModule.userRequest ||
-                  chunk.entryModule.rootModule.userRequest
-              )
-            );
-          }
-        }
-
-        chunkWrappers.push(`${chunkName}:${entryChunkWrapper}`);
-        allSources.push(...chunkSources);
-        chunkDefs.push(...chunkDefs_);
-        chunksAdded.add(chunkName);
-      } else {
-        chunkWrappers.push(
-          `${chunkName}:webpackJsonp([${chunk.id}], function(__wpcc){%s});`
-        );
-        chunkInformation.push({
-          name: chunkName,
-          parentNames: parentChunkNames,
-          sources: chunkSources,
-          definition: chunkDefs_[0],
-        });
-      }
     });
-
-    const sourceChunk = new Map();
-    while (chunkInformation.length > 0) {
-      const startLength = chunkInformation.length;
-      for (let i = 0; i < chunkInformation.length; i++) {
-        if (
-          chunkInformation[i].parentNames.every((parentName) =>
-            chunksAdded.has(parentName)
-          )
-        ) {
-          chunksAdded.add(chunkInformation[i].name);
-          if (!sourceChunk.has(chunkInformation[i].name)) {
-            sourceChunk.set(chunkInformation[i].name, new Set());
-          }
-          const sourceChunkSet = sourceChunk.get(chunkInformation[i].name);
-          for (let j = 0; j < chunkInformation[i].sources.length; j++) {
-            if (!sourceChunkSet.has(chunkInformation[i].sources[j].path)) {
-              sourceChunkSet.add(chunkInformation[i].sources[j].path);
-              allSources.push(chunkInformation[i].sources[j]);
-            }
-          }
-          chunkDefs.push(chunkInformation[i].definition);
-          chunkInformation.splice(i, 1);
-          break;
-        }
-      }
-      if (startLength === chunkInformation.length) {
-        throw new Error('Unable to build chunk map - parent chunks not found');
-      }
-    }
-
-    const sourcePaths = new Set();
-    const duplicatedSources = new Set();
-    allSources.forEach((source) => {
-      if (sourcePaths.has(source.path)) {
-        duplicatedSources.add(source.path);
-      }
-      sourcePaths.add(source.path);
-    });
-
-    if (duplicatedSources.size > 0) {
-      const duplicateErrors = [];
-      duplicatedSources.forEach((sourcePath) => {
-        const shortSource = this.requestShortener.shorten(sourcePath);
-        duplicateErrors.push({
-          level: 'error',
-          description: `${shortSource} exists in more than one bundle.
-Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
-        });
-      });
-      this.reportErrors(compilation, duplicateErrors);
-      cb();
-      return;
-    }
 
     if (jsonpRuntimeRequired) {
       const fullRuntimeSource = this.renderRuntime();
-      allSources.splice(baseChunkSourceCount, 0, fullRuntimeSource);
-      entrypoints.splice(baseChunkSourceCount, 0, fullRuntimeSource.path);
-      baseChunkSourceCount += 1;
-      chunkDefs[0] = `${BASE_CHUNK_NAME}:${baseChunkSourceCount}`;
+      const baseChunk = chunkDefs.get(BASE_CHUNK_NAME);
+      baseChunk.sources.push(fullRuntimeSource);
+      entrypoints.push(fullRuntimeSource.path);
     }
 
     const defines = [];
@@ -461,12 +371,13 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
     });
     defines.push(`_WEBPACK_PUBLIC_PATH_='${PUBLIC_PATH}'`);
 
-    const compilationOptions = Object.assign({}, this.compilerFlags, {
-      entry_point: entrypoints,
-      chunk: chunkDefs,
-      define: defines,
-      chunk_wrapper: chunkWrappers,
-    });
+    const allSources = [];
+    const compilationOptions = this.buildCompilerOptions(
+      chunkDefs,
+      entrypoints,
+      defines,
+      allSources
+    );
 
     /**
      * Invoke the compiler and return a promise of the results.
@@ -520,6 +431,59 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
         console.error(err); // eslint-disable-line no-console
         cb();
       });
+  }
+
+  /**
+   * @param {!ChunkMap} chunkDefs
+   * @param {!Array<string>} entrypoints
+   * @param {!Array<string>} defines
+   * @param {!Array<{src: string, path: string, webpackId: number, sourceMap: string}>} allSources
+   */
+  buildCompilerOptions(chunkDefs, entrypoints, defines, allSources) {
+    const chunkDefinitionStrings = [];
+    const chunkDefArray = Array.from(chunkDefs.values());
+    const chunkNamesProcessed = new Set();
+    const chunkWrappers = [];
+    while (chunkDefArray.length > 0) {
+      const startLength = chunkDefArray.length;
+      for (let i = 0; i < chunkDefArray.length; ) {
+        if (
+          Array.from(chunkDefArray[i].parentNames).every((parentName) =>
+            chunkNamesProcessed.has(parentName)
+          )
+        ) {
+          chunkNamesProcessed.add(chunkDefArray[i].name);
+          allSources.push(...chunkDefArray[i].sources);
+          let chunkDefinitionString = `${chunkDefArray[i].name}:${
+            chunkDefArray[i].sources.length
+          }`;
+          if (chunkDefArray[i].parentNames.size > 0) {
+            chunkDefinitionString += `:${Array.from(
+              chunkDefArray[i].parentNames
+            ).join(',')}`;
+          }
+          chunkDefinitionStrings.push(chunkDefinitionString);
+          if (chunkDefArray[i].outputWrapper) {
+            chunkWrappers.push(
+              `${chunkDefArray[i].name}:${chunkDefArray[i].outputWrapper}`
+            );
+          }
+          chunkDefArray.splice(i, 1);
+        } else {
+          i += 1;
+        }
+      }
+      if (startLength === chunkDefArray.length) {
+        throw new Error('Unable to build chunk map - parent chunks not found');
+      }
+    }
+
+    return Object.assign({}, this.compilerFlags, {
+      entry_point: entrypoints,
+      chunk: chunkDefinitionStrings,
+      define: defines,
+      chunk_wrapper: chunkWrappers,
+    });
   }
 
   runCompiler(compilation, flags, sources) {
@@ -712,86 +676,154 @@ Use the SplitChunksPlugin to ensure a module exists in only one bundle.`,
    *
    * @param {?} compilation
    * @param {!Chunk} chunk
-   * @param {!Array<!{src: string, path: string, sourceMap: (string|undefined)}>} sources
    * @param {!Array<string>} parentChunkNames - logical chunk parent of this tree
-   * @param {!Array<string>} chunkDefs - closure compiler chunk definitions (chunkName:parentName)
+   * @param {!ChunkMap} chunkDefs
    * @param {number} nextUniqueId
    * @param {!Array<string>} entrypoint modules
    * @return {number} next safe unique id
    */
-  addChunkToCompilation(
+  addChunkToCompilationStandard(
     compilation,
     chunk,
-    sources,
     parentChunkNames,
     chunkDefs,
     nextUniqueId,
     entrypoints
   ) {
     const chunkName = this.getChunkName(compilation, chunk);
+    const safeChunkName = chunkName.replace(/\.js$/, '');
     const chunkSources = [];
-    if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
-      const childChunkIds = Object.keys(
-        chunk.getChunkMaps(compilation.hash).hash
-      );
-      if (childChunkIds.length > 0) {
-        const childChunkPaths = this.getChildChunkPaths(
-          compilation.hash,
-          chunk,
-          'chunkId',
-          compilation,
-          this.getChunkFilenameTemplate(compilation, chunk)
-        );
-        const childModulePathRegistrationSource = {
-          path: path.resolve('.', `__webpack_register_source_${chunk.id}__.js`),
-          src:
-            '(function(chunkIds){\n' +
-            '  for (var i = 0, chunkId; i < chunkIds.length; i++) {\n' +
-            '    chunkId = chunkIds[i];\n' +
-            `    __webpack_require__.rs(chunkIds[i], ${childChunkPaths});\n` +
-            '  }\n' +
-            `})(${JSON.stringify(childChunkIds)});`,
-        };
-        chunkSources.push(childModulePathRegistrationSource);
-        entrypoints.push(childModulePathRegistrationSource.path);
+    let src = '';
+    let sourceMap = null;
+    try {
+      const souceAndMap = compilation.assets[chunk.files[0]].sourceAndMap();
+      src = souceAndMap.source;
+      if (souceAndMap.map) {
+        sourceMap = JSON.stringify(souceAndMap.map);
       }
-      chunkSources.push(
-        ...getChunkSources(
-          chunk,
-          () => {
-            const newId = nextUniqueId;
-            nextUniqueId += 1;
-            return newId;
-          },
-          compilation.dependencyTemplates,
-          compilation.runtimeTemplate
-        )
-      );
-    } else {
-      let src = '';
-      let sourceMap = null;
-      try {
-        const souceAndMap = compilation.assets[chunk.files[0]].sourceAndMap();
-        src = souceAndMap.source;
-        if (souceAndMap.map) {
-          sourceMap = JSON.stringify(souceAndMap.map);
-        }
-      } catch (e) {}
-      chunkSources.push({
-        path: chunkName,
-        src,
-        sourceMap,
+    } catch (e) {}
+    chunkSources.push({
+      path: chunkName,
+      src,
+      sourceMap,
+    });
+
+    const chunkDef = {
+      name: safeChunkName,
+      parentNames: new Set(),
+      sources: chunkSources,
+    };
+    if (parentChunkNames) {
+      parentChunkNames.forEach((parentName) => {
+        chunkDef.parentNames.add(parentName);
       });
     }
+    chunkDefs.set(safeChunkName, chunkDef);
 
-    sources.push(...chunkSources);
-    const safeChunkName = chunkName.replace(/\.js$/, '');
-    let moduleDef = `${safeChunkName}:${chunkSources.length}`;
-    if (parentChunkNames && parentChunkNames.length > 0) {
-      moduleDef += `:${parentChunkNames.join(',')}`;
+    const forEachChildChunk = (childChunk) => {
+      nextUniqueId = this.addChunkToCompilationStandard(
+        compilation,
+        childChunk,
+        [safeChunkName],
+        chunkDefs,
+        nextUniqueId,
+        entrypoints
+      );
+    };
+    for (const group of chunk.groupsIterable) {
+      for (const childGroup of group.childrenIterable) {
+        childGroup.chunks.forEach(forEachChildChunk);
+      }
     }
-    chunkDefs.push(moduleDef);
 
+    return nextUniqueId;
+  }
+
+  /**
+   * Starting from an entry point, recursively traverse the chunk group tree and add
+   * all chunk sources to the compilation
+   *
+   * @param {?} compilation
+   * @param {!Chunk} chunk
+   * @param {!Array<!{src: string, path: string, sourceMap: (string|undefined)}>} sources
+   * @param {!Array<string>} parentChunkNames - logical chunk parent of this tree
+   * @param {!ChunkMap} chunkDefs
+   * @param {number} nextUniqueId
+   * @param {!Array<string>} entrypoint modules
+   * @return {number} next safe unique id
+   */
+  addChunkToCompilationAggressive(
+    compilation,
+    chunk,
+    parentChunkNames,
+    chunkDefs,
+    nextUniqueId,
+    entrypoints
+  ) {
+    const chunkName = this.getChunkName(compilation, chunk);
+    const safeChunkName = chunkName.replace(/\.js$/, '');
+
+    if (chunkDefs.has(safeChunkName)) {
+      if (parentChunkNames.length !== 0) {
+        parentChunkNames.forEach((parentName) => {
+          chunkDefs.get(safeChunkName).parentNames.add(parentName);
+        });
+      }
+      return nextUniqueId;
+    }
+
+    const chunkSources = [];
+    const childChunkIds = Object.keys(
+      chunk.getChunkMaps(compilation.hash).hash
+    );
+    if (childChunkIds.length > 0) {
+      const childChunkPaths = this.getChildChunkPaths(
+        compilation.hash,
+        chunk,
+        'chunkId',
+        compilation,
+        this.getChunkFilenameTemplate(compilation, chunk)
+      );
+      const childModulePathRegistrationSource = {
+        path: path.resolve('.', `__webpack_register_source_${chunk.id}__.js`),
+        src:
+          '(function(chunkIds){\n' +
+          '  for (var i = 0, chunkId; i < chunkIds.length; i++) {\n' +
+          '    chunkId = chunkIds[i];\n' +
+          `    __webpack_require__.rs(chunkIds[i], ${childChunkPaths});\n` +
+          '  }\n' +
+          `})(${JSON.stringify(childChunkIds)});`,
+      };
+      chunkSources.push(childModulePathRegistrationSource);
+      entrypoints.push(childModulePathRegistrationSource.path);
+    }
+    chunkSources.push(
+      ...getChunkSources(
+        chunk,
+        () => {
+          const newId = nextUniqueId;
+          nextUniqueId += 1;
+          return newId;
+        },
+        compilation.dependencyTemplates,
+        compilation.runtimeTemplate
+      )
+    );
+
+    const chunkDef = {
+      name: safeChunkName,
+      parentNames: new Set(),
+      sources: chunkSources,
+      outputWrapper: chunk.hasEntryModule()
+        ? ENTRY_CHUNK_WRAPPER
+        : `webpackJsonp([${chunk.id}], function(__wpcc){%s});`,
+    };
+    if (parentChunkNames) {
+      parentChunkNames.forEach((parentName) => {
+        chunkDef.parentNames.add(parentName);
+      });
+    }
+    chunkDefs.set(safeChunkName, chunkDef);
     return nextUniqueId;
   }
 

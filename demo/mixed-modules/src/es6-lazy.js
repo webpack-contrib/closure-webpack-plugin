@@ -10,4 +10,6 @@ Promise.all([
       { 'CommonJs Module Late (import)':commonJsModule.default() }
     )
   );
+}).catch((e) => {
+  console.error(e);
 });

@@ -32,7 +32,7 @@ module.exports = function getChunkSources(
         sourceMap = JSON.stringify(souceAndMap.map);
       }
     } catch (e) {
-      console.error(e);
+      console.error(e); // eslint-disable-line no-console
     }
 
     return {

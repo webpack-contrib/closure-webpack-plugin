@@ -18,11 +18,10 @@
     "release": "standard-version",
     "release:ci": "conventional-github-releaser -p angular",
     "release:validate": "commitlint --from=$(git describe --tags --abbrev=0) --to=$(git rev-parse HEAD)",
-    "security": "nsp check",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --collectCoverageFrom='src/**/*.js' --coverage",
-    "ci:lint": "npm run lint && npm run security",
+    "ci:lint": "npm run lint",
     "ci:test": "npm run test -- --runInBand",
     "ci:coverage": "npm run test:coverage -- --runInBand"
   },
@@ -34,7 +33,7 @@
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {
-    "@commitlint/cli": "^5.2.6",
+    "@commitlint/cli": "^5.2.8",
     "@commitlint/config-angular": "^5.1.1",
     "@webpack-contrib/eslint-config-webpack": "^2.0.2",
     "babel-core": "^6.26.3",
@@ -49,7 +48,6 @@
     "jest": "^23.6.0",
     "lint-staged": "^4.2.3",
     "memory-fs": "^0.4.1",
-    "nsp": "^3.2.1",
     "pre-commit": "^1.2.2",
     "prettier": "^1.9.2",
     "standard-version": "^4.4.0",

@@ -11,9 +11,9 @@ module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
   }
 
   const getModuleSrcObject = (webpackModule) => {
-    let path = webpackModule.userRequest;
-    if (!path) {
-      path = `__unknown_${getUniqueId()}__`;
+    let modulePath = webpackModule.userRequest;
+    if (!modulePath) {
+      modulePath = `__unknown_${getUniqueId()}__`;
     }
     let src = '';
     let sourceMap = null;
@@ -32,7 +32,7 @@ module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
     }
 
     return {
-      path: toSafePath(path),
+      path: toSafePath(modulePath),
       src,
       sourceMap,
       webpackId: webpackModule.id ? `${webpackModule.id}` : webpackModule.id,

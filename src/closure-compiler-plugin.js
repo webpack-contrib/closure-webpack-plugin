@@ -124,8 +124,11 @@ class ClosureCompilerPlugin {
     }
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
-      // The concatenated modules plugin is not compatible with this mode
-      if (compilation.options.optimization.concatenateModules) {
+      // These default webpack optimizations are not compatible with this mode
+      if (
+        compilation.options.optimization.concatenateModules ||
+        compilation.options.optimization.usedExports
+      ) {
         compilation.warnings.push(
           new Error(
             'The concatenated modules optimization must be disabled in AGGRESSIVE_BUNDLE mode.\n' +
@@ -133,6 +136,7 @@ class ClosureCompilerPlugin {
                 {
                   optimization: {
                     concatenateModules: false,
+                    usedExports: false,
                   },
                 },
                 null,
@@ -815,7 +819,8 @@ class ClosureCompilerPlugin {
           `})(${JSON.stringify(childChunkIds)});`,
       };
       chunkSources.push(childModulePathRegistrationSource);
-      entrypoints.push(childModulePathRegistrationSource.path);
+      // puth this at the front of the entrypoints so that Closure-compiler sorts the source first
+      entrypoints.unshift(childModulePathRegistrationSource.path);
     }
     chunkSources.push(
       ...getChunkSources(

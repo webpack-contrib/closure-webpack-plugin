@@ -24,7 +24,7 @@ module.exports = class ClosureRuntimeTemplate extends RuntimeTemplate {
     const comment = this.comment({
       request,
     });
-    const getModuleFunction = `__webpack_require__.t(${comment}${idExpr})`;
+    const getModuleFunction = `__webpack_require__(${comment}${idExpr})`;
     return `${promise || 'Promise.resolve()'}.then(${getModuleFunction})`;
   }
 

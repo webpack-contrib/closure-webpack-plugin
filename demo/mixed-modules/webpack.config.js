@@ -55,9 +55,7 @@ module.exports = (env, argv) => {
             require.resolve('google-closure-library/closure/goog/deps'),
             './public/deps.js',
           ],
-        },
-        compilerFlags
-      )
+        })
     ]
   };
 };

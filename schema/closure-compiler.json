@@ -29,7 +29,7 @@
     "mode": {
       "description": "Methodology used to bundle assets in a chunk",
       "type": "string",
-      "enum": ["AGGRESSIVE_BUNDLE", "STANDARD", "NONE"]
+      "enum": ["AGGRESSIVE_BUNDLE", "STANDARD"]
     },
     "output": {
       "description": "",

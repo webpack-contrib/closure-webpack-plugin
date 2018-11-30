@@ -190,8 +190,6 @@ class ClosureCompilerPlugin {
   optimizeChunkAssets_(compilation, originalChunks, cb) {
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       this.aggressiveBundle(compilation, originalChunks, cb);
-    } else if (this.options.mode === 'NONE') {
-      cb();
     } else {
       this.standardBundle(compilation, originalChunks, cb);
     }
@@ -275,15 +273,17 @@ class ClosureCompilerPlugin {
       );
     });
 
-    compilationChain.then(() => cb()).catch((e) => {
-      if (e) {
-        if (!(e instanceof Error)) {
-          e = new Error(e);
+    compilationChain
+      .then(() => cb())
+      .catch((e) => {
+        if (e) {
+          if (!(e instanceof Error)) {
+            e = new Error(e);
+          }
+          compilation.errors.push(e);
         }
-        compilation.errors.push(e);
-      }
-      cb();
-    });
+        cb();
+      });
   }
 
   /**

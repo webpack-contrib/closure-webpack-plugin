@@ -468,7 +468,7 @@ class ClosureCompilerPlugin {
     const chunkDefinitionStrings = [];
     const chunkDefArray = Array.from(chunkDefs.values());
     const chunkNamesProcessed = new Set();
-    const chunkWrappers = [];
+    let chunkWrappers;
     while (chunkDefArray.length > 0) {
       const startLength = chunkDefArray.length;
       for (let i = 0; i < chunkDefArray.length; ) {
@@ -489,6 +489,7 @@ class ClosureCompilerPlugin {
           }
           chunkDefinitionStrings.push(chunkDefinitionString);
           if (chunkDefArray[i].outputWrapper) {
+            chunkWrappers = chunkWrappers || [];
             chunkWrappers.push(
               `${chunkDefArray[i].name}:${chunkDefArray[i].outputWrapper}`
             );
@@ -503,12 +504,15 @@ class ClosureCompilerPlugin {
       }
     }
 
-    return Object.assign({}, this.compilerFlags, {
+    const options = Object.assign({}, this.compilerFlags, {
       entry_point: entrypoints,
       chunk: chunkDefinitionStrings,
       define: defines,
-      chunk_wrapper: chunkWrappers,
     });
+    if (chunkWrappers) {
+      options.chunkWrapper = chunkWrappers;
+    }
+    return options;
   }
 
   runCompiler(compilation, flags, sources) {
@@ -715,27 +719,33 @@ class ClosureCompilerPlugin {
     const chunkName = this.getChunkName(compilation, chunk);
     const safeChunkName = chunkName.replace(/\.js$/, '');
     const chunkSources = [];
-    let src = '';
-    let sourceMap = null;
-    try {
-      const souceAndMap = compilation.assets[chunk.files[0]].sourceAndMap();
-      src = souceAndMap.source;
-      if (souceAndMap.map) {
-        sourceMap = JSON.stringify(souceAndMap.map);
+    chunk.files.forEach((chunkFile) => {
+      if (!chunkFile.match(this.options.test)) {
+        return;
       }
-    } catch (e) {
-      compilation.errors.push(e);
-    }
-    chunkSources.push({
-      path: chunkName,
-      src,
-      sourceMap,
+      let src = '';
+      let sourceMap = null;
+      try {
+        const souceAndMap = compilation.assets[chunkFile].sourceAndMap();
+        src = souceAndMap.source;
+        if (souceAndMap.map) {
+          sourceMap = JSON.stringify(souceAndMap.map);
+        }
+      } catch (e) {
+        compilation.errors.push(e);
+      }
+      chunkSources.push({
+        path: chunkName,
+        src,
+        sourceMap,
+      });
     });
 
     const chunkDef = {
       name: safeChunkName,
       parentNames: new Set(),
       sources: chunkSources,
+      outputWrapper: '(function(){%s}).call(this || window)',
     };
     if (parentChunkNames) {
       parentChunkNames.forEach((parentName) => {

@@ -438,7 +438,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         });
 
         if (
-          this.options.entryChunks.indexOf(chunk.id) < 0 &&
+          this.options.entryChunks.indexOf(chunk.name) < 0 &&
           parentChunk !== null
         ) {
           return `${defParts[0]}:webpackJsonp([${

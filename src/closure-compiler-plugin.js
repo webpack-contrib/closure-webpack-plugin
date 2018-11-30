@@ -7,10 +7,9 @@ const {
 } = require('google-closure-compiler/lib/utils');
 const { ConcatSource, SourceMapSource } = require('webpack-sources');
 const RequestShortener = require('webpack/lib/RequestShortener');
-const HarmonyImportDependencyTemplate = require('./dependencies/harmony-import-dependency-template');
-const HarmonyImportSpecifierDependencyTemplate = require('./dependencies/harmony-import-specifier-dependency-template');
+const ModuleTemplate = require('webpack/lib/ModuleTemplate');
+const ClosureRuntimeTemplate = require('./closure-runtime-template');
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
-const ImportDependencyTemplate = require('./dependencies/import-dependency-template');
 const AMDDefineDependencyTemplate = require('./dependencies/amd-define-dependency-template');
 const validateOptions = require('schema-utils');
 const closureCompilerPluginSchema = require('../schema/closure-compiler.json');
@@ -96,12 +95,26 @@ class ClosureCompilerPlugin {
   apply(compiler) {
     this.requestShortener = new RequestShortener(compiler.context);
 
+    if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
+      compiler.hooks.thisCompilation.tap(PLUGIN, (compilation) => {
+        compilation.runtimeTemplate = new ClosureRuntimeTemplate(
+          compilation.outputOptions,
+          compilation.requestShortener
+        );
+        compilation.moduleTemplates = {
+          javascript: new ModuleTemplate(
+            compilation.runtimeTemplate,
+            'javascript'
+          ),
+        };
+      });
+    }
     compiler.hooks.compilation.tap(PLUGIN, (compilation, params) =>
       this.complation_(compilation, params)
     );
   }
 
-  complation_(compilation, params) {
+  complation_(compilation) {
     const runFullCompilation =
       !compilation.compiler.parentCompilation ||
       this.options.childCompilations(compilation);
@@ -112,7 +125,22 @@ class ClosureCompilerPlugin {
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       // The concatenated modules plugin is not compatible with this mode
-      compilation.options.optimization.concatenateModules = false;
+      if (compilation.options.optimization.concatenateModules) {
+        compilation.warnings.push(
+          new Error(
+            'The concatenated modules optimization must be disabled in AGGRESSIVE_BUNDLE mode.\n' +
+              JSON.stringify(
+                {
+                  optimization: {
+                    concatenateModules: false,
+                  },
+                },
+                null,
+                2
+              )
+          )
+        );
+      }
 
       // It's very difficult to override a specific dependency template without rewriting the entire set.
       // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
@@ -126,7 +154,6 @@ class ClosureCompilerPlugin {
               );
               break;
 
-            case 'HarmonyCompatibilityDependency':
             case 'HarmonyExportExpressionDependency':
             case 'HarmonyExportHeaderDependency':
             case 'HarmonyExportImportedSpecifierDependency':
@@ -134,27 +161,6 @@ class ClosureCompilerPlugin {
               compilation.dependencyTemplates.set(
                 key,
                 new HarmonyNoopTemplate()
-              );
-              break;
-
-            case 'ImportDependency':
-              compilation.dependencyTemplates.set(
-                key,
-                new ImportDependencyTemplate()
-              );
-              break;
-
-            case 'HarmonyImportDependency':
-              compilation.dependencyTemplates.set(
-                key,
-                new HarmonyImportDependencyTemplate()
-              );
-              break;
-
-            case 'HarmonyImportSpecifierDependency':
-              compilation.dependencyTemplates.set(
-                key,
-                new HarmonyImportSpecifierDependencyTemplate()
               );
               break;
 
@@ -236,14 +242,11 @@ class ClosureCompilerPlugin {
               if (!matchingChunk) {
                 return;
               }
-              let assetName;
-              if (chunkIdParts) {
-                assetName = chunk.files[0];
-              } else {
-                assetName = outputFile.path.replace(/^\.\//, '');
-                if (!/\.js$/.test(chunk.files[0])) {
-                  assetName = assetName.substr(0, assetName.length - 3);
-                }
+              let [assetName] = chunkIdParts
+                ? chunk.files
+                : [outputFile.path.replace(/^\.\//, '')];
+              if (chunkIdParts && !/\.js$/.test(chunk.files[0])) {
+                assetName = assetName.substr(0, assetName.length - 3);
               }
               const sourceMap = JSON.parse(outputFile.source_map);
               sourceMap.file = assetName;
@@ -258,12 +261,25 @@ class ClosureCompilerPlugin {
             });
           })
           .catch((e) => {
-            console.error(e);
+            if (e) {
+              if (!(e instanceof Error)) {
+                e = new Error(e);
+              }
+              compilation.errors.push(e);
+            }
           })
       );
     });
 
-    compilationChain.then(() => cb()).catch(() => cb());
+    compilationChain.then(() => cb()).catch((e) => {
+      if (e) {
+        if (!(e instanceof Error)) {
+          e = new Error(e);
+        }
+        compilation.errors.push(e);
+      }
+      cb();
+    });
   }
 
   /**
@@ -427,8 +443,13 @@ class ClosureCompilerPlugin {
 
         cb();
       })
-      .catch((err) => {
-        console.error(err); // eslint-disable-line no-console
+      .catch((e) => {
+        if (e) {
+          if (!(e instanceof Error)) {
+            e = new Error(e);
+          }
+          compilation.errors.push(e);
+        }
         cb();
       });
   }
@@ -516,9 +537,6 @@ class ClosureCompilerPlugin {
         }
 
         resolve(compilationResult.compiledFiles);
-      }).catch((e) => {
-        console.error(e); // eslint-disable-line no-console
-        throw e;
       });
     }
     return new Promise((resolve, reject) => {
@@ -701,7 +719,9 @@ class ClosureCompilerPlugin {
       if (souceAndMap.map) {
         sourceMap = JSON.stringify(souceAndMap.map);
       }
-    } catch (e) {}
+    } catch (e) {
+      compilation.errors.push(e);
+    }
     chunkSources.push({
       path: chunkName,
       src,
@@ -805,8 +825,7 @@ class ClosureCompilerPlugin {
           nextUniqueId += 1;
           return newId;
         },
-        compilation.dependencyTemplates,
-        compilation.runtimeTemplate
+        compilation
       )
     );
 

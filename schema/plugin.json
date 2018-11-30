@@ -63,6 +63,13 @@
           "$ref": "#/definitions/platform"
         }
       }]
+    },
+    "entryChunks": {
+      "description": "Chunks regarded as entry chunks, will not be wrapped by webpackJsonp",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   }
 }

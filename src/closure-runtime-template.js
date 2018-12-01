@@ -1,7 +1,6 @@
 const RuntimeTemplate = require('webpack/lib/RuntimeTemplate');
 const Template = require('webpack/lib/Template');
-
-const BASIC_PROPERTY_TEST = /^[a-zA-Z$_][a-zA-Z$_0-9]*$/;
+const unquotedValidator = require('unquoted-property-validator');
 
 module.exports = class ClosureRuntimeTemplate extends RuntimeTemplate {
   moduleNamespacePromise({ block, module, request, message }) {
@@ -87,12 +86,12 @@ module.exports = class ClosureRuntimeTemplate extends RuntimeTemplate {
       }
       const comment =
         used !== exportName ? Template.toNormalComment(exportName) + ' ' : '';
-      let access;
-      if (BASIC_PROPERTY_TEST.test(used)) {
-        access = `${importVar}.${used}`;
-      } else {
-        access = `${importVar}[${comment}${JSON.stringify(used)}]`;
+      const unquotedAccess = unquotedValidator(used);
+      let access = `.${used}`;
+      if (unquotedAccess.needsQuotes || unquotedAccess.needsBrackets) {
+        access = `[${comment}${unquotedAccess.quotedValue}]`;
       }
+      access = `${importVar}${access}`;
       if (isCall) {
         if (callContext === false && asiSafe) {
           return `(0,${access})`;

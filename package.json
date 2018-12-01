@@ -33,6 +33,7 @@
     "acorn-dynamic-import": "^2.0.0",
     "google-closure-compiler": ">=20180805.0.0",
     "schema-utils": "1.x",
+    "unquoted-property-validator": "^1.0.2",
     "webpack-sources": "1.x"
   },
   "devDependencies": {

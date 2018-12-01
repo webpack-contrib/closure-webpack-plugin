@@ -9,6 +9,8 @@ const { ConcatSource, SourceMapSource } = require('webpack-sources');
 const RequestShortener = require('webpack/lib/RequestShortener');
 const ModuleTemplate = require('webpack/lib/ModuleTemplate');
 const ClosureRuntimeTemplate = require('./closure-runtime-template');
+const HarmonyExportParserPlugin = require('./dependencies/harmony-export-parser-plugin');
+const HarmonyExportDependency = require('./dependencies/harmony-export-dependency');
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
 const AMDDefineDependencyTemplate = require('./dependencies/amd-define-dependency-template');
 const validateOptions = require('schema-utils');
@@ -96,25 +98,44 @@ class ClosureCompilerPlugin {
     this.requestShortener = new RequestShortener(compiler.context);
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
-      compiler.hooks.thisCompilation.tap(PLUGIN, (compilation) => {
-        compilation.runtimeTemplate = new ClosureRuntimeTemplate(
-          compilation.outputOptions,
-          compilation.requestShortener
-        );
-        compilation.moduleTemplates = {
-          javascript: new ModuleTemplate(
-            compilation.runtimeTemplate,
-            'javascript'
-          ),
-        };
-      });
+      compiler.hooks.thisCompilation.tap(
+        PLUGIN,
+        (compilation, { normalModuleFactory }) => {
+          compilation.runtimeTemplate = new ClosureRuntimeTemplate(
+            compilation.outputOptions,
+            compilation.requestShortener
+          );
+          compilation.moduleTemplates = {
+            javascript: new ModuleTemplate(
+              compilation.runtimeTemplate,
+              'javascript'
+            ),
+          };
+
+          const parserCallback = (parser, parserOptions) => {
+            if (parserOptions.harmony !== undefined && !parserOptions.harmony) {
+              return;
+            }
+            new HarmonyExportParserPlugin().apply(parser);
+          };
+          normalModuleFactory.hooks.parser
+            .for('javascript/auto')
+            .tap(PLUGIN.name, parserCallback);
+          normalModuleFactory.hooks.parser
+            .for('javascript/dynamic')
+            .tap(PLUGIN.name, parserCallback);
+          normalModuleFactory.hooks.parser
+            .for('javascript/esm')
+            .tap(PLUGIN.name, parserCallback);
+        }
+      );
     }
     compiler.hooks.compilation.tap(PLUGIN, (compilation, params) =>
       this.complation_(compilation, params)
     );
   }
 
-  complation_(compilation) {
+  complation_(compilation, { normalModuleFactory }) {
     const runFullCompilation =
       !compilation.compiler.parentCompilation ||
       this.options.childCompilations(compilation);
@@ -125,10 +146,7 @@ class ClosureCompilerPlugin {
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       // These default webpack optimizations are not compatible with this mode
-      if (
-        compilation.options.optimization.concatenateModules ||
-        compilation.options.optimization.usedExports
-      ) {
+      if (compilation.options.optimization.concatenateModules) {
         compilation.warnings.push(
           new Error(
             'The concatenated modules optimization must be disabled in AGGRESSIVE_BUNDLE mode.\n' +
@@ -146,6 +164,15 @@ class ClosureCompilerPlugin {
         );
       }
 
+      compilation.dependencyFactories.set(
+        HarmonyExportDependency,
+        normalModuleFactory
+      );
+      compilation.dependencyTemplates.set(
+        HarmonyExportDependency,
+        new HarmonyExportDependency.Template()
+      );
+
       // It's very difficult to override a specific dependency template without rewriting the entire set.
       // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
       Promise.resolve().then(() => {
@@ -158,8 +185,8 @@ class ClosureCompilerPlugin {
               );
               break;
 
-            case 'HarmonyExportExpressionDependency':
             case 'HarmonyExportHeaderDependency':
+            case 'HarmonyExportExpressionDependency':
             case 'HarmonyExportImportedSpecifierDependency':
             case 'HarmonyExportSpecifierDependency':
               compilation.dependencyTemplates.set(

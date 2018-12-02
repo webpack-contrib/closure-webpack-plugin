@@ -9,8 +9,9 @@ const { ConcatSource, SourceMapSource } = require('webpack-sources');
 const RequestShortener = require('webpack/lib/RequestShortener');
 const ModuleTemplate = require('webpack/lib/ModuleTemplate');
 const ClosureRuntimeTemplate = require('./closure-runtime-template');
-const HarmonyExportParserPlugin = require('./dependencies/harmony-export-parser-plugin');
+const HarmonyParserPlugin = require('./dependencies/harmony-parser-plugin');
 const HarmonyExportDependency = require('./dependencies/harmony-export-dependency');
+const HarmonyImportDependency = require('./dependencies/harmony-import-dependency');
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
 const AMDDefineDependencyTemplate = require('./dependencies/amd-define-dependency-template');
 const validateOptions = require('schema-utils');
@@ -116,7 +117,7 @@ class ClosureCompilerPlugin {
             if (parserOptions.harmony !== undefined && !parserOptions.harmony) {
               return;
             }
-            new HarmonyExportParserPlugin().apply(parser);
+            new HarmonyParserPlugin().apply(parser);
           };
           normalModuleFactory.hooks.parser
             .for('javascript/auto')
@@ -145,25 +146,6 @@ class ClosureCompilerPlugin {
     }
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
-      // These default webpack optimizations are not compatible with this mode
-      if (compilation.options.optimization.concatenateModules) {
-        compilation.warnings.push(
-          new Error(
-            'The concatenated modules optimization must be disabled in AGGRESSIVE_BUNDLE mode.\n' +
-              JSON.stringify(
-                {
-                  optimization: {
-                    concatenateModules: false,
-                    usedExports: false,
-                  },
-                },
-                null,
-                2
-              )
-          )
-        );
-      }
-
       compilation.dependencyFactories.set(
         HarmonyExportDependency,
         normalModuleFactory
@@ -171,6 +153,14 @@ class ClosureCompilerPlugin {
       compilation.dependencyTemplates.set(
         HarmonyExportDependency,
         new HarmonyExportDependency.Template()
+      );
+      compilation.dependencyFactories.set(
+        HarmonyImportDependency,
+        normalModuleFactory
+      );
+      compilation.dependencyTemplates.set(
+        HarmonyImportDependency,
+        new HarmonyImportDependency.Template()
       );
 
       // It's very difficult to override a specific dependency template without rewriting the entire set.
@@ -185,6 +175,8 @@ class ClosureCompilerPlugin {
               );
               break;
 
+            case 'HarmonyImportSideEffectDependency':
+            case 'HarmonyImportSpecifierDependency':
             case 'HarmonyExportHeaderDependency':
             case 'HarmonyExportExpressionDependency':
             case 'HarmonyExportImportedSpecifierDependency':
@@ -856,7 +848,7 @@ class ClosureCompilerPlugin {
           `})(${JSON.stringify(childChunkIds)});`,
       };
       chunkSources.push(childModulePathRegistrationSource);
-      // puth this at the front of the entrypoints so that Closure-compiler sorts the source first
+      // put this at the front of the entrypoints so that Closure-compiler sorts the source to the top of the chunk
       entrypoints.unshift(childModulePathRegistrationSource.path);
     }
     chunkSources.push(

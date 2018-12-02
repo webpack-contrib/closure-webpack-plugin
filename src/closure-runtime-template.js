@@ -84,21 +84,12 @@ module.exports = class ClosureRuntimeTemplate extends RuntimeTemplate {
         const comment = Template.toNormalComment(`unused export ${exportName}`);
         return `${comment} undefined`;
       }
-      const comment =
-        used !== exportName ? Template.toNormalComment(exportName) + ' ' : '';
-      const unquotedAccess = unquotedValidator(used);
-      let access = `.${used}`;
+      const unquotedAccess = unquotedValidator(exportName);
+      let access = `.${exportName}`;
       if (unquotedAccess.needsQuotes || unquotedAccess.needsBrackets) {
-        access = `[${comment}${unquotedAccess.quotedValue}]`;
+        access = `[${unquotedAccess.quotedValue}]`;
       }
       access = `${importVar}${access}`;
-      if (isCall) {
-        if (callContext === false && asiSafe) {
-          return `(0,${access})`;
-        } else if (callContext === false) {
-          return `Object(${access})`;
-        }
-      }
       return access;
     }
     return importVar;

@@ -13,7 +13,9 @@ module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
   const getModuleSrcObject = (webpackModule) => {
     let modulePath = webpackModule.userRequest;
     if (!modulePath) {
-      modulePath = `__unknown_${getUniqueId()}__`;
+      modulePath = webpackModule.id
+        ? `__missing_path_${webpackModule.id}__`
+        : `__missing_path_no_id_${getUniqueId()}__`;
     }
     let src = '';
     let sourceMap = null;

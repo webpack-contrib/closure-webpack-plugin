@@ -114,6 +114,7 @@ class ClosureCompilerPlugin {
           };
 
           const parserCallback = (parser, parserOptions) => {
+            // eslint-disable-next-line no-undefined
             if (parserOptions.harmony !== undefined && !parserOptions.harmony) {
               return;
             }
@@ -342,44 +343,74 @@ class ClosureCompilerPlugin {
       .get(BASE_CHUNK_NAME)
       .sources.slice(1)
       .map((source) => source.path);
-    originalChunks.forEach((chunk) => {
-      let parentChunkNames;
-      if (chunk.hasEntryModule()) {
-        parentChunkNames = [BASE_CHUNK_NAME];
+
+    compilation.chunkGroups.forEach((chunkGroup) => {
+      // If a chunk is split by the SplitChunksPlugin, the original chunk name
+      // will be set as the chunk group name.
+      const primaryChunk = chunkGroup.chunks.find(
+        (chunk) => chunk.name === chunkGroup.options.name
+      );
+      const secondaryChunks = chunkGroup.chunks.filter(
+        (chunk) => chunk.name !== chunkGroup.options.name
+      );
+      const secondaryParentNames = [];
+      let primaryParentNames = [];
+
+      // Entrypoints are chunk groups with no parents
+      if (chunkGroup.getParents().length === 0) {
+        primaryParentNames.push(BASE_CHUNK_NAME);
         if (
-          chunk.entryModule.userRequest ||
-          chunk.entryModule.rootModule.userRequest
+          primaryChunk.entryModule.userRequest ||
+          primaryChunk.entryModule.rootModule.userRequest
         ) {
           entrypoints.push(
             toSafePath(
-              chunk.entryModule.userRequest ||
-                chunk.entryModule.rootModule.userRequest
+              primaryChunk.entryModule.userRequest ||
+                primaryChunk.entryModule.rootModule.userRequest
             )
           );
         }
       } else {
         jsonpRuntimeRequired = true;
-        parentChunkNames = compilation.chunkGroups
-          .filter((chunkGroup) => chunk.isInGroup(chunkGroup))
-          .reduce((parentChunkGroups, chunkGroup) => {
-            if (chunkGroup.getParents().length > 0) {
-              parentChunkGroups.push(...chunkGroup.getParents());
-            }
-            return parentChunkGroups;
-          }, [])
-          .reduce((parentChunks, parentChunkGroup) => {
-            parentChunks.push(...parentChunkGroup.chunks);
-            return parentChunks;
-          }, [])
-          .map((parentChunk) =>
-            this.getChunkName(compilation, parentChunk).replace(/\.js$/, '')
+        chunkGroup.getParents().forEach((parentGroup) => {
+          const primaryParentChunk = parentGroup.chunks.find(
+            (chunk) => chunk.name === parentGroup.options.name
           );
+
+          // Chunks created from a split must be set as the parent of the original chunk.
+          secondaryParentNames.push(
+            this.getChunkName(compilation, primaryParentChunk).replace(
+              /\.js$/,
+              ''
+            )
+          );
+        });
+      }
+      secondaryChunks.forEach((secondaryChunk) => {
+        uniqueId = this.addChunkToCompilationAggressive(
+          compilation,
+          secondaryChunk,
+          secondaryParentNames,
+          chunkDefs,
+          uniqueId,
+          entrypoints
+        );
+      });
+
+      if (secondaryChunks.length === 0) {
+        primaryParentNames = secondaryParentNames;
+      } else {
+        primaryParentNames.push(
+          ...secondaryChunks.map((chunk) =>
+            this.getChunkName(compilation, chunk).replace(/\.js$/, '')
+          )
+        );
       }
 
-      uniqueId += this.addChunkToCompilationAggressive(
+      uniqueId = this.addChunkToCompilationAggressive(
         compilation,
-        chunk,
-        parentChunkNames,
+        primaryChunk,
+        primaryParentNames,
         chunkDefs,
         uniqueId,
         entrypoints

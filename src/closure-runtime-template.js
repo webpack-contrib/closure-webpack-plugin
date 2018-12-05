@@ -23,7 +23,7 @@ module.exports = class ClosureRuntimeTemplate extends RuntimeTemplate {
     const comment = this.comment({
       request,
     });
-    const getModuleFunction = `__webpack_require__(${comment}${idExpr})`;
+    const getModuleFunction = `function() { return __webpack_require__.t(${comment}${idExpr}); }`;
     return `${promise || 'Promise.resolve()'}.then(${getModuleFunction})`;
   }
 

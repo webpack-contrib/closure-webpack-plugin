@@ -17,7 +17,7 @@ class ClosureHarmonyExportDependency extends NullDependency {
   getExports() {
     return {
       exports: [this.id],
-      dependencies: undefined,
+      dependencies: undefined, // eslint-disable-line no-undefined
     };
   }
 }

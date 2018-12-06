@@ -1,11 +1,11 @@
 require.ensure([
-  './lib/esModule',
-  './lib/commonJsModule',
+  './es6',
+  './commonjs',
   'object-assign'
 ], function(require) {
   const assign = require('object-assign');
-  const commonJsModule = require('./lib/commonJsModule');
-  const esModule = require('./lib/esModule');
+  const commonJsModule = require('./commonjs');
+  const esModule = require('./es6');
   const entry = document.querySelector('#entry');
   entry.textContent += JSON.stringify(
     assign(

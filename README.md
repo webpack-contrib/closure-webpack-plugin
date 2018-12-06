@@ -33,7 +33,8 @@ module.exports = {
         // debug: true,
         // renaming: false
       })
-    ]
+    ],
+    concatenatedModules: false
   }
 };
 ```

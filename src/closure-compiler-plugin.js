@@ -354,14 +354,15 @@ class ClosureCompilerPlugin {
         (chunk) => chunk.name !== chunkGroup.options.name
       );
       const secondaryParentNames = [];
-      let primaryParentNames = [];
+      const primaryParentNames = [];
 
       // Entrypoints are chunk groups with no parents
-      if (chunkGroup.getParents().length === 0) {
+      if (primaryChunk && primaryChunk.entryModule) {
         primaryParentNames.push(BASE_CHUNK_NAME);
         if (
-          primaryChunk.entryModule.userRequest ||
-          primaryChunk.entryModule.rootModule.userRequest
+          primaryChunk.entryModule &&
+          (primaryChunk.entryModule.userRequest ||
+            primaryChunk.entryModule.rootModule.userRequest)
         ) {
           entrypoints.push(
             toSafePath(
@@ -370,20 +371,42 @@ class ClosureCompilerPlugin {
             )
           );
         }
+      } else if (chunkGroup.getParents().length === 0) {
+        if (secondaryChunks.size > 0) {
+          secondaryParentNames.push(BASE_CHUNK_NAME);
+        } else if (primaryChunk) {
+          primaryParentNames.push(BASE_CHUNK_NAME);
+        }
       } else {
         jsonpRuntimeRequired = true;
         chunkGroup.getParents().forEach((parentGroup) => {
           const primaryParentChunk = parentGroup.chunks.find(
             (chunk) => chunk.name === parentGroup.options.name
           );
-
-          // Chunks created from a split must be set as the parent of the original chunk.
-          secondaryParentNames.push(
-            this.getChunkName(compilation, primaryParentChunk).replace(
-              /\.js$/,
-              ''
-            )
-          );
+          const parentNames = [];
+          if (primaryParentChunk) {
+            // Chunks created from a split must be set as the parent of the original chunk.
+            parentNames.push(
+              this.getChunkName(compilation, primaryParentChunk).replace(
+                /\.js$/,
+                ''
+              )
+            );
+          } else {
+            parentNames.push(
+              ...parentGroup.chunks.map((parentChunk) =>
+                this.getChunkName(compilation, primaryParentChunk).replace(
+                  /\.js$/,
+                  ''
+                )
+              )
+            );
+          }
+          if (secondaryChunks.length > 0) {
+            secondaryParentNames.push(...parentNames);
+          } else {
+            primaryParentNames.push(...parentNames);
+          }
         });
       }
       secondaryChunks.forEach((secondaryChunk) => {
@@ -397,24 +420,23 @@ class ClosureCompilerPlugin {
         );
       });
 
-      if (secondaryChunks.length === 0) {
-        primaryParentNames = secondaryParentNames;
-      } else {
-        primaryParentNames.push(
-          ...secondaryChunks.map((chunk) =>
-            this.getChunkName(compilation, chunk).replace(/\.js$/, '')
-          )
+      // Primary chunks logically depend on modules in the secondary chunks
+      primaryParentNames.push(
+        ...secondaryChunks.map((chunk) =>
+          this.getChunkName(compilation, chunk).replace(/\.js$/, '')
+        )
+      );
+
+      if (primaryChunk) {
+        uniqueId = this.addChunkToCompilationAggressive(
+          compilation,
+          primaryChunk,
+          primaryParentNames,
+          chunkDefs,
+          uniqueId,
+          entrypoints
         );
       }
-
-      uniqueId = this.addChunkToCompilationAggressive(
-        compilation,
-        primaryChunk,
-        primaryParentNames,
-        chunkDefs,
-        uniqueId,
-        entrypoints
-      );
     });
 
     if (jsonpRuntimeRequired) {
@@ -448,6 +470,35 @@ class ClosureCompilerPlugin {
       defines,
       allSources
     );
+
+    // Check for duplicate sources
+    const visitedSources = new Set();
+    const duplicateSources = new Set();
+    allSources.forEach((srcInfo) => {
+      if (visitedSources.has(srcInfo.path)) {
+        duplicateSources.add(srcInfo.path);
+      }
+      visitedSources.add(srcInfo.path);
+    });
+    if (duplicateSources.size > 0) {
+      const chunkDefArray = Array.from(chunkDefs.values());
+      duplicateSources.forEach((duplicateSourcePath) => {
+        const containingChunks = chunkDefArray.filter((chunkDef) =>
+          chunkDef.sources.find(
+            (srcInfo) => srcInfo.path === duplicateSourcePath
+          )
+        );
+        compilation.errors.push(
+          new Error(
+            `${duplicateSourcePath} exists in multiple chunks: ${JSON.stringify(
+              containingChunks.map((chunkDef) => chunkDef.name)
+            )}.\n  Use the Split Chunks Plugin to ensure modules only exist in a single chunk.`
+          )
+        );
+      });
+      cb();
+      return;
+    }
 
     /**
      * Invoke the compiler and return a promise of the results.

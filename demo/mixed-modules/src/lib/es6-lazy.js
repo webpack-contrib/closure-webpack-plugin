@@ -1,6 +1,6 @@
 Promise.all([
-  import('./lib/esModule'),
-  import('./lib/commonJsModule'),
+  import('./es6'),
+  import('./commonjs'),
   import('object-assign')
 ]).then(([esModule, commonJsModule, assign]) => {
   const entry = document.querySelector('#entry');

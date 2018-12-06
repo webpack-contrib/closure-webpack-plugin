@@ -1,7 +1,7 @@
 import assign from 'object-assign';
 
 // ES Module
-import esModule from './lib/esModule';
+import esModule from './lib/es6';
 
 // goog.xxx
 const math = goog.require('goog.math');
@@ -23,3 +23,6 @@ document.querySelector('#entry').textContent = JSON.stringify(
     {'goog.math.average(10, 20, 30, 40)': math.average(10, 20, 30, 40)}
   )
 );
+
+import('./lib/commonjs-lazy');
+import('./lib/es6-lazy');

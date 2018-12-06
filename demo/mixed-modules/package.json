@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "run-s build:deps start:devserver",
-    "start:devserver": "webpack-dev-server",
+    "start:devserver": "webpack-dev-server --mode=development",
     "build": "run-s build:deps build:webpack",
     "build:webpack": "webpack -p --mode=production",
     "build:deps": "./node_modules/google-closure-library/closure/bin/build/depswriter.py --root_with_prefix 'src ../../../../src' > public/deps.js",
@@ -21,7 +21,7 @@
   "devDependencies": {
     "npm-run-all": "^4.1.2",
     "webpack": "4.x",
-    "webpack-cli": "^3.1.2",
+    "webpack-cli": "3.x",
     "webpack-dev-server": "3.x"
   }
 }

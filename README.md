@@ -33,8 +33,7 @@ module.exports = {
         // debug: true,
         // renaming: false
       })
-    ],
-    concatenatedModules: false
+    ]
   }
 };
 ```
@@ -85,6 +84,10 @@ Aggressive Bundle Mode utilizes a custom runtime in which modules within a chunk
 This avoids [the cost of small modules](https://nolanlawson.com/2016/08/15/the-cost-of-small-modules/).
 
 In Aggressive Bundle Mode, a file can only appear in a single output chunk. Use the [Split Chunks Plugin](https://webpack.js.org/plugins/split-chunks-plugin/) to split duplicated files into a single output chunk.
+
+The [concatenatedModules optimization](https://webpack.js.org/configuration/optimization/#optimization-concatenatemodules)
+is not compatible with this mode since Closure-Compiler performs an equivalent optimization).
+The plugin will emit a warning if this optimization is not disabled.
 
 ## Multiple Output Languages
 

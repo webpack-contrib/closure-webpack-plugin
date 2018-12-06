@@ -45,7 +45,7 @@ module.exports = {
     - `JAVASCRIPT` does not require the JVM to be installed. Not all flags are supported. 
     - `JAVA` utilizes the jvm. Utilizes multiple threads for parsing and results in faster compilation for large builds.
     - `NATIVE` only available on linux or MacOS. Faster compilation times without requiring a JVM.
- * **mode** - `STANDARD` (default), `AGGRESSIVE_BUNDLE` or `NONE`. Controls how the plugin utilizes the compiler.  
+ * **mode** - `STANDARD` (default) or `AGGRESSIVE_BUNDLE`. Controls how the plugin utilizes the compiler.  
     - `STANDARD` mode, closure-compiler is used as a direct replacement for other minifiers as well as most Babel transformations.  
     - `AGGRESSIVE_BUNDLE` mode, the compiler performs additional optimizations of modules to produce a much smaller file
  * **childCompilations** - boolean or function. Defaults to `false`.

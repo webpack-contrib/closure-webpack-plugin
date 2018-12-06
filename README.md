@@ -12,10 +12,6 @@ It offers unmatched optimizations, provides type checking and can easily target 
 [Closure-Library](https://developers.google.com/closure/library/) is a utility library designed for full compatibility
 with Closure-Compiler. 
 
-## Webpack 4 Known Issues
-
- * The dynamic import `import('foo')` will not return the namespace for CommonJS modules currently.
-
 ## Older Versions
 
 For webpack 3 support, see https://github.com/webpack-contrib/closure-webpack-plugin/tree/webpack-3

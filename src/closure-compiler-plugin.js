@@ -147,6 +147,25 @@ class ClosureCompilerPlugin {
     }
 
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
+      // These default webpack optimizations are not compatible with this mode
+      if (compilation.options.optimization.concatenateModules) {
+        compilation.warnings.push(
+          new Error(
+            PLUGIN.name +
+              ': The concatenated modules optimization is not compatible with AGGRESSIVE_BUNDLE mode.\n' +
+              JSON.stringify(
+                {
+                  optimization: {
+                    concatenateModules: false,
+                  },
+                },
+                null,
+                2
+              )
+          )
+        );
+      }
+
       compilation.dependencyFactories.set(
         HarmonyExportDependency,
         normalModuleFactory

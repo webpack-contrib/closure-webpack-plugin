@@ -436,7 +436,7 @@ class ClosureCompilerPlugin {
         primaryParentNames.push(BASE_CHUNK_NAME);
         const entryModulePath =
           primaryChunk.entryModule.userRequest ||
-          (primaryChunk.entryModule.rootModule ||
+          (primaryChunk.entryModule.rootModule &&
             primaryChunk.entryModule.rootModule.userRequest) ||
           `__missing_path_${primaryChunk.entryModule.id}__`;
         entrypoints.push(toSafePath(entryModulePath));

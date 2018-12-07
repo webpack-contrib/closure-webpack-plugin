@@ -285,7 +285,7 @@ class ClosureCompilerPlugin {
 
   standardBundle(compilation, originalChunks, cb) {
     let uniqueId = 1;
-    let compilationChain = Promise.resolve();
+    const compilations = [];
     originalChunks.forEach((chunk) => {
       if (!chunk.hasEntryModule()) {
         return;
@@ -317,8 +317,8 @@ class ClosureCompilerPlugin {
       }
       compilationOptions.externs = externs;
 
-      compilationChain = compilationChain.then(() =>
-        this.runCompiler(compilation, compilationOptions, sources)
+      compilations.push(
+        this.runCompiler(compilation, compilationOptions, sources, chunkDefs)
           .then((outputFiles) => {
             outputFiles.forEach((outputFile) => {
               const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
@@ -361,7 +361,14 @@ class ClosureCompilerPlugin {
       );
     });
 
-    compilationChain
+    originalChunks.forEach((chunk) => {
+      const chunkFilename = this.getChunkName(compilation, chunk);
+      if (!chunk.files.includes(chunkFilename)) {
+        chunk.files.push(chunkFilename);
+      }
+    });
+
+    Promise.all(compilations)
       .then(() => cb())
       .catch((e) => {
         if (e) {

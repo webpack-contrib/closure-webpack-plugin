@@ -434,18 +434,12 @@ class ClosureCompilerPlugin {
       // Entrypoints are chunk groups with no parents
       if (primaryChunk && primaryChunk.entryModule) {
         primaryParentNames.push(BASE_CHUNK_NAME);
-        if (
-          primaryChunk.entryModule &&
-          (primaryChunk.entryModule.userRequest ||
-            primaryChunk.entryModule.rootModule.userRequest)
-        ) {
-          entrypoints.push(
-            toSafePath(
-              primaryChunk.entryModule.userRequest ||
-                primaryChunk.entryModule.rootModule.userRequest
-            )
-          );
-        }
+        const entryModulePath =
+          primaryChunk.entryModule.userRequest ||
+          (primaryChunk.entryModule.rootModule ||
+            primaryChunk.entryModule.rootModule.userRequest) ||
+          `__missing_path_${primaryChunk.entryModule.id}__`;
+        entrypoints.push(toSafePath(entryModulePath));
       } else if (chunkGroup.getParents().length === 0) {
         if (secondaryChunks.size > 0) {
           secondaryParentNames.push(BASE_CHUNK_NAME);

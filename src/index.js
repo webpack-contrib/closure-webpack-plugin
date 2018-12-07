@@ -327,6 +327,15 @@ class ClosureCompilerPlugin {
     let uniqueId = 1;
     let jsonpRuntimeRequired = false;
     const entryPoints = new Set();
+    if (
+      this.options.runtimeNeedlessChunks &&
+      Array.isArray(this.options.runtimeNeedlessChunks)
+    ) {
+      originalChunks.forEach((chunk) => {
+        chunk.runtimeNeedless =
+          this.options.runtimeNeedlessChunks.indexOf(chunk.name) >= 0;
+      });
+    }
     originalChunks.forEach((chunk) => {
       if (chunk.hasEntryModule()) {
         if (chunk.entryModule.userRequest) {
@@ -353,10 +362,7 @@ class ClosureCompilerPlugin {
 
       // The jsonp runtime must be injected if at least one module
       // is late loaded (doesn't include the runtime)
-      if (
-        !chunk.hasRuntime() &&
-        this.options['runtimeNeedlessChunks'].indexOf(chunk.name) < 0
-      ) {
+      if (!chunk.hasRuntime() && !chunk.runtimeNeedless) {
         jsonpRuntimeRequired = true;
       }
     });
@@ -440,10 +446,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
           }
         });
 
-        if (
-          this.options['runtimeNeedlessChunks'].indexOf(chunk.name) < 0 &&
-          parentChunk !== null
-        ) {
+        if (parentChunk !== null && !chunk.runtimeNeedless) {
           return `${defParts[0]}:webpackJsonp([${
             chunk.id
           }], function(__wpcc){%s});`;

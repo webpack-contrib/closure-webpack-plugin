@@ -64,8 +64,8 @@
         }
       }]
     },
-    "entryChunks": {
-      "description": "Chunks regarded as entry chunks, will not be wrapped by webpackJsonp",
+    "runtimeNeedlessChunks": {
+      "description": "Chunks that don't need webpack runtime, which is useful when use goog.module.ModuleManager for lazy loading",
       "type": "array",
       "items": {
         "type": "string"

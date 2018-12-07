@@ -353,7 +353,10 @@ class ClosureCompilerPlugin {
 
       // The jsonp runtime must be injected if at least one module
       // is late loaded (doesn't include the runtime)
-      if (!chunk.hasRuntime()) {
+      if (
+        !chunk.hasRuntime() &&
+        this.options['runtimeNeedlessChunks'].indexOf(chunk.name) < 0
+      ) {
         jsonpRuntimeRequired = true;
       }
     });
@@ -438,7 +441,7 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         });
 
         if (
-          this.options.entryChunks.indexOf(chunk.name) < 0 &&
+          this.options['runtimeNeedlessChunks'].indexOf(chunk.name) < 0 &&
           parentChunk !== null
         ) {
           return `${defParts[0]}:webpackJsonp([${

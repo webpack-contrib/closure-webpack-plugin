@@ -12,6 +12,7 @@ const ClosureRuntimeTemplate = require('./closure-runtime-template');
 const HarmonyParserPlugin = require('./dependencies/harmony-parser-plugin');
 const HarmonyExportDependency = require('./dependencies/harmony-export-dependency');
 const HarmonyImportDependency = require('./dependencies/harmony-import-dependency');
+const HarmonyMarkerDependency = require('./dependencies/harmony-marker-dependency');
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
 const AMDDefineDependencyTemplate = require('./dependencies/amd-define-dependency-template');
 const validateOptions = require('schema-utils');
@@ -182,6 +183,14 @@ class ClosureCompilerPlugin {
         HarmonyImportDependency,
         new HarmonyImportDependency.Template()
       );
+      compilation.dependencyFactories.set(
+        HarmonyMarkerDependency,
+        normalModuleFactory
+      );
+      compilation.dependencyTemplates.set(
+        HarmonyMarkerDependency,
+        new HarmonyMarkerDependency.Template()
+      );
 
       // It's very difficult to override a specific dependency template without rewriting the entire set.
       // Microtask timing is used to ensure that these overrides occur after the main template plugins run.
@@ -219,11 +228,51 @@ class ClosureCompilerPlugin {
       moduleArg.useSourceMap = true;
     });
 
+    compilation.hooks.afterOptimizeDependencies.tap(PLUGIN, (webpackModules) =>
+      this.removeMarkers(webpackModules)
+    );
+
     compilation.hooks.optimizeChunkAssets.tapAsync(
       PLUGIN,
       (originalChunks, cb) =>
         this.optimizeChunkAssets_(compilation, originalChunks, cb)
     );
+  }
+
+  /**
+   * The webpack harmony plugin adds constant dependencies to clear
+   * out parts of both import and export statements. We need to remove those
+   * dependencies and the associated markers so that closure-compiler sees the
+   * original import and export statement.
+   *
+   * @param {!Array<!Module>}
+   */
+  removeMarkers(webpackModules) {
+    webpackModules.forEach((webpackModule) => {
+      if (!/^javascript\//.test(webpackModule.type)) {
+        return;
+      }
+      const markerDependencies = webpackModule.dependencies.filter(
+        (dep) => dep instanceof HarmonyMarkerDependency
+      );
+      if (markerDependencies.length > 0) {
+        webpackModule.dependencies.slice().forEach((dep) => {
+          if (
+            dep.constructor.name === 'ConstDependency' &&
+            markerDependencies.find(
+              (marker) =>
+                marker.range[0] === dep.range[0] &&
+                marker.range[1] === dep.range[1]
+            )
+          ) {
+            webpackModule.removeDependency(dep);
+          }
+        });
+        markerDependencies.forEach((marker) =>
+          webpackModule.removeDependency(marker)
+        );
+      }
+    });
   }
 
   optimizeChunkAssets_(compilation, originalChunks, cb) {
@@ -428,6 +477,7 @@ class ClosureCompilerPlugin {
           }
         });
       }
+
       secondaryChunks.forEach((secondaryChunk) => {
         uniqueId = this.addChunkToCompilationAggressive(
           compilation,
@@ -924,6 +974,8 @@ class ClosureCompilerPlugin {
         });
       }
       return nextUniqueId;
+    } else if (!chunk.files.includes(chunkName)) {
+      chunk.files.push(chunkName);
     }
 
     const chunkSources = [];

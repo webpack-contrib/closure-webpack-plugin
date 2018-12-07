@@ -1,5 +1,6 @@
 const HarmonyExportDependency = require('./harmony-export-dependency');
 const HarmonyImportDependency = require('./harmony-import-dependency');
+const HarmonyMarkerDependency = require('./harmony-marker-dependency');
 
 const PLUGIN_NAME = 'ClosureCompilerPlugin';
 
@@ -22,12 +23,16 @@ class HarmonyParserPlugin {
       }
     );
 
+    parser.hooks.exportImport.tap(PLUGIN_NAME, (statement) => {
+      parser.state.current.addDependency(
+        new HarmonyMarkerDependency(statement.range)
+      );
+    });
+
     parser.hooks.import.tap('ClosureCompilerPlugin', (statement, source) => {
-      parser.state.module.dependencies.forEach((dep) => {
-        if (dep.constructor.name === 'ConstDependency') {
-          dep.range[1] = dep.range[0] - 1;
-        }
-      });
+      parser.state.current.addDependency(
+        new HarmonyMarkerDependency(statement.range)
+      );
       const dep = new HarmonyImportDependency(
         source,
         parser.state.module,

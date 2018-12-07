@@ -24,7 +24,6 @@ class ClosureHarmonyExportDependency extends NullDependency {
 
 ClosureHarmonyExportDependency.Template = class ClosureHarmonyExportDependencyTemplate {
   apply(dep, source) {
-    // debugger;
     const used = dep.originModule.isUsed(dep.name);
     if (!used) {
       const replaceUntil =

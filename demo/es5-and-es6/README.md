@@ -1,13 +1,11 @@
-# Mixed modules demo
+# Multiple output languages demo
 
-This is a demo using mixed modules, which includes the following module systems and libraries.
+This is a demo showing how the webpack-closure-plugin can be used to output both
+ES5 and ES6 transpiled JS with a single webpack build. The language polyfills are only
+added to the ES5 build.
 
-* Closure Script(`goog.require`)
-* Closure Modules(`goog.module`)
-* ES Modules(ES Modules)
-
-* Closure Library
-* npm package
+Use `<script type="module" src="es6_out_path.js">` to target modern browsers and
+`<script nomodule src="es5_out_path.js">` for older browsers.
 
 ## How to use
 

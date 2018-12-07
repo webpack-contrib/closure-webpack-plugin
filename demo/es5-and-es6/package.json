@@ -1,0 +1,25 @@
+{
+  "name": "es5-and-es6",
+  "version": "1.0.0",
+  "description": "An example for multiple output languages",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack-dev-server --mode=production",
+    "build": "webpack -p --mode=production",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Chad Killingsworth <chadkillingsworth@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@polymer/polymer": "^3.1.0",
+    "@webcomponents/webcomponentsjs": "^2.2.1",
+    "copy-webpack-plugin": "^4.6.0"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.2",
+    "webpack": "4.x",
+    "webpack-cli": "3.x",
+    "webpack-dev-server": "3.x"
+  }
+}

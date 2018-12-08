@@ -24,5 +24,7 @@ document.querySelector('#entry').textContent = JSON.stringify(
   )
 );
 
-import('./lib/commonjs-lazy');
-import('./lib/es6-lazy');
+(async function() {
+  await import('./lib/commonjs-lazy');
+  await import('./lib/es6-lazy');
+})();

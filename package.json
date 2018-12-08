@@ -31,7 +31,6 @@
   "dependencies": {
     "acorn": "^5.0.0",
     "acorn-dynamic-import": "^2.0.0",
-    "google-closure-compiler": "^20181205.0.0",
     "schema-utils": "1.x",
     "unquoted-property-validator": "^1.0.2",
     "webpack-sources": "1.x"
@@ -48,6 +47,7 @@
     "eslint": "^4.19.1",
     "eslint-plugin-import": "^2.8.0",
     "eslint-plugin-prettier": "^2.4.0",
+    "google-closure-compiler": ">=20181205.0.0",
     "husky": "^0.14.3",
     "jest": "^23.6.0",
     "lint-staged": "^4.2.3",
@@ -61,6 +61,7 @@
     "node": ">= 6.9.0 || >= 8.9.0"
   },
   "peerDependencies": {
+    "google-closure-compiler": ">=20181205.0.0",
     "webpack": "4.x"
   },
   "homepage": "https://github.com/webpack-contrib/closure-webpack-plugin",

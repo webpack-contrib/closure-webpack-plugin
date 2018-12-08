@@ -16,6 +16,14 @@ with Closure-Compiler.
 
 For webpack 3 support, see https://github.com/webpack-contrib/closure-webpack-plugin/tree/webpack-3
 
+## Install
+
+You must install both the google-closure-compiler package as well as the closure-webpack-plugin.
+
+```
+npm install --save-dev closure-webpack-plugin google-closure-compiler
+```
+
 ## Usage example
 
 ```js

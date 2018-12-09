@@ -28,7 +28,7 @@ module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
           .sourceAndMap();
         src = souceAndMap.source;
         if (souceAndMap.map) {
-          sourceMap = JSON.stringify(souceAndMap.map);
+          sourceMap = souceAndMap.map;
         }
       } catch (e) {
         compilation.errors.push(e);

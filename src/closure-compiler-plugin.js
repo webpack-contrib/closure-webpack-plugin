@@ -603,6 +603,11 @@ class ClosureCompilerPlugin {
           );
           sourceMap.file = assetName;
           const source = outputFile.src;
+          if (sourceMap.sources) {
+            sourceMap.sources = sourceMap.sources.map((srcMapPath) =>
+              this.requestShortener.shorten(srcMapPath)
+            );
+          }
           let newSource = new SourceMapSource(
             source,
             assetName,
@@ -649,7 +654,12 @@ class ClosureCompilerPlugin {
           )
         ) {
           chunkNamesProcessed.add(chunkDefArray[i].name);
-          allSources.push(...chunkDefArray[i].sources);
+          chunkDefArray[i].sources.forEach((srcInfo) => {
+            if (srcInfo.sourceMap) {
+              srcInfo.sourceMap = JSON.stringify(srcInfo.sourceMap);
+            }
+            allSources.push(srcInfo);
+          });
           let chunkDefinitionString = `${chunkDefArray[i].name}:${
             chunkDefArray[i].sources.length
           }`;
@@ -900,7 +910,7 @@ class ClosureCompilerPlugin {
         const souceAndMap = compilation.assets[chunkFile].sourceAndMap();
         src = souceAndMap.source;
         if (souceAndMap.map) {
-          sourceMap = JSON.stringify(souceAndMap.map);
+          sourceMap = souceAndMap.map;
         }
       } catch (e) {
         compilation.errors.push(e);
@@ -1170,12 +1180,14 @@ ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE = {
   process_common_js_modules: true,
   dependency_mode: 'STRICT',
   assume_function_wrapper: true,
+  source_map_include_content: true,
 };
 
 /** @const */
 ClosureCompilerPlugin.DEFAULT_FLAGS_STANDARD = {
   language_in: 'ECMASCRIPT_NEXT',
   language_out: 'ECMASCRIPT5_STRICT',
+  source_map_include_content: true,
 };
 
 module.exports = ClosureCompilerPlugin;

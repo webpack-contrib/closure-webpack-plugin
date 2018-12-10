@@ -47,7 +47,7 @@
     "eslint": "^4.19.1",
     "eslint-plugin-import": "^2.8.0",
     "eslint-plugin-prettier": "^2.4.0",
-    "google-closure-compiler": ">=20181205.0.0",
+    "google-closure-compiler": "20181209.0.0-webpack-beta",
     "husky": "^0.14.3",
     "jest": "^23.6.0",
     "lint-staged": "^4.2.3",
@@ -61,7 +61,7 @@
     "node": ">= 6.9.0 || >= 8.9.0"
   },
   "peerDependencies": {
-    "google-closure-compiler": ">=20181205.0.0",
+    "google-closure-compiler": "20181209.0.0-webpack-beta",
     "webpack": "4.x"
   },
   "homepage": "https://github.com/webpack-contrib/closure-webpack-plugin",

@@ -19,6 +19,7 @@ const validateOptions = require('schema-utils');
 const closureCompilerPluginSchema = require('../schema/closure-compiler.json');
 const toSafePath = require('./safe-path');
 const getChunkSources = require('./chunk-sources');
+const getWebpackModuleName = require('./module-name');
 const ClosureLibraryPlugin = require('./closure-library-plugin');
 
 const ENTRY_CHUNK_WRAPPER =
@@ -426,7 +427,7 @@ class ClosureCompilerPlugin {
         (chunk) => chunk.name === chunkGroup.options.name
       );
       const secondaryChunks = chunkGroup.chunks.filter(
-        (chunk) => chunk.name !== chunkGroup.options.name
+        (chunk) => chunk !== primaryChunk
       );
       const secondaryParentNames = [];
       const primaryParentNames = [];
@@ -434,12 +435,13 @@ class ClosureCompilerPlugin {
       // Entrypoints are chunk groups with no parents
       if (primaryChunk && primaryChunk.entryModule) {
         primaryParentNames.push(BASE_CHUNK_NAME);
-        const entryModulePath =
-          primaryChunk.entryModule.userRequest ||
-          (primaryChunk.entryModule.rootModule &&
-            primaryChunk.entryModule.rootModule.userRequest) ||
-          `__missing_path_${primaryChunk.entryModule.id}__`;
-        entrypoints.push(toSafePath(entryModulePath));
+        const entryModuleDeps =
+          primaryChunk.entryModule.type === 'multi entry'
+            ? primaryChunk.entryModule.dependencies
+            : [primaryChunk.entryModule];
+        entryModuleDeps.forEach((entryDep) => {
+          entrypoints.push(toSafePath(getWebpackModuleName(entryDep)));
+        });
       } else if (chunkGroup.getParents().length === 0) {
         if (secondaryChunks.size > 0) {
           secondaryParentNames.push(BASE_CHUNK_NAME);

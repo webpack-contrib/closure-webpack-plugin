@@ -1,4 +1,5 @@
 const toSafePath = require('./safe-path');
+const getWebpackModuleName = require('./module-name');
 
 module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
   if (chunk.isEmpty()) {
@@ -11,14 +12,7 @@ module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
   }
 
   const getModuleSrcObject = (webpackModule) => {
-    let modulePath =
-      webpackModule.userRequest ||
-      (webpackModule.rootModule && webpackModule.rootModule.userRequest);
-    if (!modulePath) {
-      modulePath = webpackModule.id
-        ? `__missing_path_${webpackModule.id}__`
-        : `__missing_path_no_id_${getUniqueId()}__`;
-    }
+    const modulePath = getWebpackModuleName(webpackModule);
     let src = '';
     let sourceMap = null;
     if (/javascript/.test(webpackModule.type)) {
@@ -39,13 +33,33 @@ module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
       path: toSafePath(modulePath),
       src,
       sourceMap,
-      webpackId: webpackModule.id ? `${webpackModule.id}` : webpackModule.id,
+      webpackId:
+        webpackModule.id !== null &&
+        webpackModule.id !== undefined &&
+        webpackModule.id.toString().length > 0
+          ? `${webpackModule.id}`
+          : null,
     };
+  };
+
+  const getChunkModuleSources = (chunkModules, webpackModule) => {
+    const moduleDeps =
+      webpackModule.type === 'multi entry'
+        ? webpackModule.dependencies
+        : [webpackModule];
+
+    // Multi entry modules have no userRequest or id, but they do have multiple
+    // nested dependencies. Traverse all of them.
+    moduleDeps.forEach((subModule) => {
+      chunkModules.push(getModuleSrcObject(subModule));
+    });
+
+    return chunkModules;
   };
 
   return chunk
     .getModules()
-    .map((webpackModule) => getModuleSrcObject(webpackModule))
+    .reduce(getChunkModuleSources, [])
     .filter(
       (moduleJson) =>
         !(

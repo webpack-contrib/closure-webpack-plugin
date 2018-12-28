@@ -1002,38 +1002,25 @@ class ClosureCompilerPlugin {
   /**
    * Return the filename template for a given chunk
    *
-   * @param compilation
-   * @param chunk
+   * @param {!Object} compilation
+   * @param {boolean} isEntryModule
    * @return {string}
    */
-  getChunkFilenameTemplate(compilation, chunk) {
-    let filenameTemplate;
-    if (this.options.output) {
-      let { filename } = compilation.outputOptions;
-      if (this.options.output && this.options.output.filename) {
-        filename = this.options.output.filename; // eslint-disable-line prefer-destructuring
-      }
-      let { chunkFilename } = compilation.outputOptions;
-      if (this.options.output && this.options.output.chunkFilename) {
-        chunkFilename = this.options.output.chunkFilename; // eslint-disable-line prefer-destructuring
-      } else if (this.options.output && this.options.output.filename) {
-        chunkFilename = filename;
-      } else {
-        chunkFilename = compilation.outputOptions.chunkFilename; // eslint-disable-line prefer-destructuring
-      }
-      filenameTemplate = chunk.hasEntryModule() ? filename : chunkFilename;
-    } else {
-      const { filename } = compilation.outputOptions;
-      const { chunkFilename } = compilation.outputOptions;
-      if (chunk.filenameTemplate) {
-        filenameTemplate = chunk.filenameTemplate; // eslint-disable-line prefer-destructuring
-      } else if (chunk.hasEntryModule()) {
-        filenameTemplate = filename;
-      } else {
-        filenameTemplate = chunkFilename;
-      }
+  getChunkFilenameTemplate(compilation, isEntrypoint) {
+    const outputOptions = this.options.output || {};
+    let { filename } = compilation.outputOptions;
+    if (outputOptions.filename) {
+      filename = outputOptions.filename; // eslint-disable-line prefer-destructuring
     }
-    return filenameTemplate;
+    let { chunkFilename } = compilation.outputOptions;
+    if (outputOptions.chunkFilename) {
+      chunkFilename = outputOptions.chunkFilename; // eslint-disable-line prefer-destructuring
+    } else if (outputOptions.filename) {
+      chunkFilename = filename;
+    } else {
+      chunkFilename = compilation.outputOptions.chunkFilename; // eslint-disable-line prefer-destructuring
+    }
+    return isEntrypoint ? filename : chunkFilename;
   }
 
   /**
@@ -1043,7 +1030,10 @@ class ClosureCompilerPlugin {
    * @param {!Chunk} chunk
    */
   getChunkName(compilation, chunk) {
-    const filenameTemplate = this.getChunkFilenameTemplate(compilation, chunk);
+    const filenameTemplate = this.getChunkFilenameTemplate(
+      compilation,
+      chunk.hasEntryModule()
+    );
     const useChunkHash =
       !chunk.hasEntryModule() ||
       (compilation.mainTemplate.useChunkHash &&
@@ -1051,6 +1041,7 @@ class ClosureCompilerPlugin {
     return compilation.getPath(filenameTemplate, {
       noChunkHash: !useChunkHash,
       chunk,
+      hash: useChunkHash ? chunk.hash : compilation.hash,
     });
   }
 
@@ -1170,16 +1161,14 @@ class ClosureCompilerPlugin {
     }
 
     const chunkSources = [];
-    const childChunkIds = Object.keys(
-      chunk.getChunkMaps(compilation.hash).hash
-    );
+    const childChunkIds = Object.keys(chunk.getChunkMaps().hash);
     if (childChunkIds.length > 0) {
       const childChunkPaths = this.getChildChunkPaths(
         compilation.hash,
         chunk,
         'chunkId',
         compilation,
-        this.getChunkFilenameTemplate(compilation, chunk)
+        this.getChunkFilenameTemplate(compilation, false)
       );
       const childModulePathRegistrationSource = {
         path: path.resolve('.', `__webpack_register_source_${chunk.id}__.js`),
@@ -1232,7 +1221,7 @@ class ClosureCompilerPlugin {
     chunkFilename
   ) {
     const { mainTemplate } = compilation;
-    const chunkMaps = chunk.getChunkMaps(hash);
+    const chunkMaps = chunk.getChunkMaps();
     return mainTemplate.getAssetPath(JSON.stringify(chunkFilename), {
       hash: `" + ${mainTemplate.renderCurrentHashCode(hash)} + "`,
       hashWithLength: (length) =>

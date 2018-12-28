@@ -5,7 +5,7 @@ const {
   getFirstSupportedPlatform,
   getNativeImagePath,
 } = require('google-closure-compiler/lib/utils');
-const { ConcatSource, SourceMapSource } = require('webpack-sources');
+const { ConcatSource, SourceMapSource, RawSource } = require('webpack-sources');
 const RequestShortener = require('webpack/lib/RequestShortener');
 const ModuleTemplate = require('webpack/lib/ModuleTemplate');
 const ClosureRuntimeTemplate = require('./closure-runtime-template');
@@ -35,6 +35,14 @@ const ENTRY_CHUNK_WRAPPER =
  */
 var ChunkMap;
 
+/**
+ * Find the filename of a chunk which matches either the id or path provided.
+ *
+ * @param {!Chunk} chunk
+ * @param {number} chunkId
+ * @param {string} outputFilePath
+ * @return {string|undefined}
+ */
 function findChunkFile(chunk, chunkId, outputFilePath) {
   for (let i = 0; i < chunk.files.length; i++) {
     const chunkFile = chunk.files[i];
@@ -56,7 +64,122 @@ function findChunkFile(chunk, chunkId, outputFilePath) {
   return undefined; // eslint-disable-line no-undefined
 }
 
-const PLUGIN = { name: 'ClosureCompilerPlugin' };
+/**
+ * Find an ancestor of a chunk. Return the distance from the target or -1 if not found.
+ *
+ * @param {!ChunkMap} chunkDefMap
+ * @param {string} chunkName
+ * @param {string} targetName
+ * @param {number} currentDistance
+ * @return {number} distance from target of parent or -1 when not found
+ */
+function findAncestorDistance(
+  chunkDefMap,
+  chunkName,
+  targetName,
+  currentDistance
+) {
+  if (targetName === chunkName) {
+    return currentDistance;
+  }
+
+  const chunkDef = chunkDefMap.get(chunkName);
+  if (!chunkDef) {
+    return -1;
+  }
+
+  const distances = [];
+  chunkDef.parentNames.forEach((parentName) => {
+    const distance = findAncestorDistance(
+      chunkDefMap,
+      parentName,
+      targetName,
+      currentDistance + 1
+    );
+    if (distance >= 0) {
+      distances.push(distance);
+    }
+  });
+  if (distances.length === 0) {
+    return -1;
+  }
+  return Math.min(...distances);
+}
+
+/**
+ * Find the closest common parent chunk from a list.
+ * Since closure-compiler requires a chunk tree to have a single root,
+ * there will always be a common parent.
+ *
+ * @param {!ChunkMap} chunkDefMap
+ * @param {!Array<string>} chunkNames
+ * @param {number} currentDistance
+ * @return {{name: string, distance: number}}
+ */
+function findNearestCommonParentChunk(
+  chunkDefMap,
+  chunkNames,
+  currentDistance = 0
+) {
+  // Map of chunk name to distance from target
+  const distances = new Map();
+  for (let i = 1; i < chunkNames.length; i++) {
+    const distance = findAncestorDistance(
+      chunkDefMap,
+      chunkNames[i],
+      chunkNames[0],
+      currentDistance
+    );
+    if (distance < 0) {
+      distances.delete(chunkNames[0]);
+    } else if (
+      !distances.has(chunkNames[0]) ||
+      distance < distances.get(chunkNames[0])
+    ) {
+      distances.set(chunkNames[0], distance);
+    }
+  }
+  if (distances.size === 0) {
+    const chunkDef = chunkDefMap.get(chunkNames[0]);
+    if (!chunkDef) {
+      return {
+        name: undefined,
+        distance: -1,
+      };
+    }
+    chunkDef.parentNames.forEach((chunkParentName) => {
+      const distanceRecord = findNearestCommonParentChunk(
+        chunkDefMap,
+        [chunkParentName].concat(chunkNames.slice(1)),
+        currentDistance + 1
+      );
+      if (
+        distanceRecord.distance >= 0 &&
+        (!distances.has(distanceRecord.name) ||
+          distances.get(distanceRecord.name) < distanceRecord.distance)
+      ) {
+        distances.set(distanceRecord.name, distanceRecord.distance);
+      }
+    });
+  }
+
+  const nearestCommonParent = {
+    name: undefined,
+    distance: -1,
+  };
+  distances.forEach((distance, chunkName) => {
+    if (
+      nearestCommonParent.distance < 0 ||
+      distance < nearestCommonParent.distance
+    ) {
+      nearestCommonParent.name = chunkName;
+      nearestCommonParent.distance = distance;
+    }
+  });
+  return nearestCommonParent;
+}
+
+const PLUGIN = { name: 'closure-compiler-plugin' };
 
 class ClosureCompilerPlugin {
   constructor(options, compilerFlags) {
@@ -535,6 +658,58 @@ class ClosureCompilerPlugin {
     });
     defines.push(`_WEBPACK_PUBLIC_PATH_='${PUBLIC_PATH}'`);
 
+    // Build a map of every source and any chunks that reference it
+    /** @type {!Map<string, !Set<string>>} */
+    const sourceChunkMap = new Map();
+    chunkDefs.forEach((chunkDef) => {
+      chunkDef.sources.forEach((srcInfo) => {
+        let sourceChunks = sourceChunkMap.get(srcInfo.path);
+        if (!sourceChunks) {
+          sourceChunks = new Set();
+          sourceChunkMap.set(srcInfo.path, sourceChunks);
+        }
+        sourceChunks.add(chunkDef.name);
+      });
+    });
+
+    // Find any sources with more than 1 chunk and move the source to the nearest common ancestor
+    sourceChunkMap.forEach((sourceChunks, sourcePath) => {
+      if (sourceChunks.size < 2) {
+        return;
+      }
+      const chunks = Array.from(sourceChunks);
+      const commonParent = findNearestCommonParentChunk(chunkDefs, chunks);
+      if (commonParent.distance >= 0) {
+        const targetChunkDef = chunkDefs.get(commonParent.name);
+        if (!targetChunkDef) {
+          return;
+        }
+        const firstChunkDef = chunkDefs.get(chunks[0]);
+        if (!firstChunkDef) {
+          return;
+        }
+        const srcInfo = firstChunkDef.sources.find(
+          (srcInfo) => srcInfo.path === sourcePath
+        );
+        if (!srcInfo) {
+          return;
+        }
+        sourceChunks.forEach((chunkName) => {
+          const chunkDef = chunkDefs.get(chunkName);
+          if (!chunkName) {
+            return;
+          }
+          const srcIndex = chunkDef.sources.findIndex(
+            (srcInfo) => srcInfo.path === sourcePath
+          );
+          if (srcIndex >= 0) {
+            chunkDef.sources.splice(srcIndex, 1);
+          }
+        });
+        targetChunkDef.sources.push(srcInfo);
+      }
+    });
+
     const allSources = [];
     const compilationOptions = this.buildCompilerOptions(
       chunkDefs,
@@ -989,6 +1164,9 @@ class ClosureCompilerPlugin {
       return nextUniqueId;
     } else if (!chunk.files.includes(chunkName)) {
       chunk.files.push(chunkName);
+      if (!compilation.assets[chunkName]) {
+        compilation.assets[chunkName] = new RawSource('');
+      }
     }
 
     const chunkSources = [];

@@ -29,7 +29,6 @@ class GoogRequireParserPlugin {
     const googPathsByNamespace = new Map();
     this.googPathsByNamespace = googPathsByNamespace;
     const googDepsByPath = new Map();
-    this.googDepsByPath = googDepsByPath;
 
     Object.keys(this.options.extraDeps).forEach((namespace) => {
       this.googPathsByNamespace.set(

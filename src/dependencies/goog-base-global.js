@@ -9,6 +9,7 @@ goog.global = window;
 window.goog = goog;
 module.exports = goog;`;
     source.insert(source.source().length, content);
+    source.insert(0, 'this.CLOSURE_NO_DEPS = true;\n');
   }
 }
 

@@ -651,11 +651,6 @@ class ClosureCompilerPlugin {
           );
           sourceMap.file = assetName;
           const source = outputFile.src;
-          if (sourceMap.sources) {
-            sourceMap.sources = sourceMap.sources.map((srcMapPath) =>
-              this.requestShortener.shorten(srcMapPath)
-            );
-          }
           let newSource = new SourceMapSource(
             source,
             assetName,

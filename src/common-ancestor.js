@@ -58,7 +58,7 @@ function findAncestorDistance(
  * @param {!ChunkMap} chunkDefMap
  * @param {!Array<string>} chunkNames
  * @param {number} currentDistance
- * @return {{name: string, distance: number}}
+ * @return {{name: (string|undefined), distance: number}}
  */
 function findNearestCommonParentChunk(
   chunkDefMap,

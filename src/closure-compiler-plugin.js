@@ -293,21 +293,29 @@ class ClosureCompilerPlugin {
     }
   }
 
+  /**
+   * Use webpack standard bundles and runtime, but utilize closure-compiler as the minifier.
+   *
+   * @param {!Object} compilation
+   * @param {!Array<!Chunk>} originalChunks
+   * @param {function()} cb
+   */
   standardBundle(compilation, originalChunks, cb) {
-    let uniqueId = 1;
     const compilations = [];
+    // We need to invoke closure compiler for each entry point. Loop through
+    // each chunk and find any entry points.
+    // Add the entry point and any descendant chunks to the compilation.
     originalChunks.forEach((chunk) => {
       if (!chunk.hasEntryModule()) {
         return;
       }
       const chunkDefs = new Map();
       const entrypoints = [];
-      uniqueId += this.addChunkToCompilationStandard(
+      this.addChunkToCompilationStandard(
         compilation,
         chunk,
         null,
         chunkDefs,
-        uniqueId,
         entrypoints
       );
       const sources = [];
@@ -375,6 +383,9 @@ class ClosureCompilerPlugin {
       const chunkFilename = this.getChunkName(compilation, chunk);
       if (!chunk.files.includes(chunkFilename)) {
         chunk.files.push(chunkFilename);
+        if (!compilation.assets[chunkFilename]) {
+          compilation.assets[chunkFilename] = new RawSource('');
+        }
       }
     });
 
@@ -400,6 +411,9 @@ class ClosureCompilerPlugin {
     const basicRuntimePath = require.resolve('./basic-runtime.js');
     const externsPath = require.resolve('./aggressive-bundle-externs.js');
 
+    // Closure compiler requires the chunk graph to have a single root node.
+    // Since webpack can have multiple entry points, add a synthetic root
+    // to the graph.
     const BASE_CHUNK_NAME = 'required-base';
     /** @type {!ChunkMap} */
     const chunkDefs = new Map([
@@ -422,7 +436,6 @@ class ClosureCompilerPlugin {
         },
       ],
     ]);
-    let uniqueId = 1;
     let jsonpRuntimeRequired = false;
     const entrypoints = chunkDefs
       .get(BASE_CHUNK_NAME)
@@ -435,6 +448,9 @@ class ClosureCompilerPlugin {
       const primaryChunk = chunkGroup.chunks.find(
         (chunk) => chunk.name === chunkGroup.options.name
       );
+      // Add any other chunks in the group to a 2nd array.
+      // For closure-compiler, the primary chunk will be a descendant of any
+      // secondary chunks.
       const secondaryChunks = chunkGroup.chunks.filter(
         (chunk) => chunk !== primaryChunk
       );
@@ -491,12 +507,11 @@ class ClosureCompilerPlugin {
       }
 
       secondaryChunks.forEach((secondaryChunk) => {
-        uniqueId = this.addChunkToCompilationAggressive(
+        this.addChunkToCompilationAggressive(
           compilation,
           secondaryChunk,
           secondaryParentNames,
           chunkDefs,
-          uniqueId,
           entrypoints
         );
       });
@@ -509,12 +524,11 @@ class ClosureCompilerPlugin {
       );
 
       if (primaryChunk) {
-        uniqueId = this.addChunkToCompilationAggressive(
+        this.addChunkToCompilationAggressive(
           compilation,
           primaryChunk,
           primaryParentNames,
           chunkDefs,
-          uniqueId,
           entrypoints
         );
       }
@@ -558,7 +572,8 @@ class ClosureCompilerPlugin {
       });
     });
 
-    // Find any sources with more than 1 chunk and move the source to the nearest common ancestor
+    // Find any sources with more than 1 chunk and move the source up the graph
+    // to the nearest common ancestor
     sourceChunkMap.forEach((sourceChunks, sourcePath) => {
       if (sourceChunks.size < 2) {
         return;
@@ -604,42 +619,12 @@ class ClosureCompilerPlugin {
       allSources
     );
 
-    // Check for duplicate sources
-    const visitedSources = new Set();
-    const duplicateSources = new Set();
-    allSources.forEach((srcInfo) => {
-      if (visitedSources.has(srcInfo.path)) {
-        duplicateSources.add(srcInfo.path);
-      }
-      visitedSources.add(srcInfo.path);
-    });
-    if (duplicateSources.size > 0) {
-      const chunkDefArray = Array.from(chunkDefs.values());
-      duplicateSources.forEach((duplicateSourcePath) => {
-        const containingChunks = chunkDefArray.filter((chunkDef) =>
-          chunkDef.sources.find(
-            (srcInfo) => srcInfo.path === duplicateSourcePath
-          )
-        );
-        compilation.errors.push(
-          new Error(
-            `${duplicateSourcePath} exists in multiple chunks: ${JSON.stringify(
-              containingChunks.map((chunkDef) => chunkDef.name)
-            )}.\n  Use the Split Chunks Plugin to ensure modules only exist in a single chunk.`
-          )
-        );
-      });
-      cb();
-      return;
-    }
-
-    /**
-     * Invoke the compiler and return a promise of the results.
-     * Success returns an array of output files.
-     * Failure returns the exit code.
-     */
+    // Invoke the compiler and return a promise of the results.
+    // Success returns an array of output files.
+    // Failure returns the exit code.
     this.runCompiler(compilation, compilationOptions, allSources)
       .then((outputFiles) => {
+        // Find the synthetic root chunk
         const baseFile = outputFiles.find((file) =>
           /required-base/.test(file.path)
         );
@@ -678,6 +663,7 @@ class ClosureCompilerPlugin {
             null,
             null
           );
+          // Concatenate our synthentic root chunk with an entry point
           if (chunk.hasRuntime()) {
             newSource = new ConcatSource(baseSrc, newSource);
           }
@@ -708,6 +694,9 @@ class ClosureCompilerPlugin {
     const chunkDefArray = Array.from(chunkDefs.values());
     const chunkNamesProcessed = new Set();
     let chunkWrappers;
+    // Chunks must be listed in the compiler options in dependency order.
+    // Loop through the list of chunk definitions and add them to the options
+    // when all of the parents for that chunk have been added.
     while (chunkDefArray.length > 0) {
       const startLength = chunkDefArray.length;
       for (let i = 0; i < chunkDefArray.length; ) {
@@ -743,6 +732,8 @@ class ClosureCompilerPlugin {
           i += 1;
         }
       }
+      // Sanity check - make sure we added at least one chunk to the output
+      // in this loop iteration. Prevents infinite loops.
       if (startLength === chunkDefArray.length) {
         throw new Error('Unable to build chunk map - parent chunks not found');
       }
@@ -759,6 +750,23 @@ class ClosureCompilerPlugin {
     return options;
   }
 
+  /**
+   * Invoke closure compiler with a set of flags and source files
+   *
+   * @param {!Object} compilation
+   * @param {!Object<string, (string|!Array<string>|boolean)>} flags
+   * @param {!Array<!{
+   *     path: string,
+   *     src: string,
+   *     sourceMap: string,
+   *     webpackModuleId: (string|null|undefined)
+   *   }>} sources
+   * @return {Promise<!Array<!{
+   *     path: string,
+   *     src: string,
+   *     sourceMap: string
+   *   }>>}
+   */
   runCompiler(compilation, flags, sources) {
     const platform = getFirstSupportedPlatform(this.options.platform);
     if (platform.toLowerCase() === 'javascript') {
@@ -933,22 +941,19 @@ class ClosureCompilerPlugin {
 
   /**
    * Starting from an entry point, recursively traverse the chunk group tree and add
-   * all chunk sources to the compilation
+   * all chunk sources to the compilation.
    *
    * @param {?} compilation
    * @param {!Chunk} chunk
    * @param {!Array<string>} parentChunkNames - logical chunk parent of this tree
    * @param {!ChunkMap} chunkDefs
-   * @param {number} nextUniqueId
-   * @param {!Array<string>} entrypoint modules
-   * @return {number} next safe unique id
+   * @param {!Array<string>} entrypoints modules
    */
   addChunkToCompilationStandard(
     compilation,
     chunk,
     parentChunkNames,
     chunkDefs,
-    nextUniqueId,
     entrypoints
   ) {
     const chunkName = this.getChunkName(compilation, chunk);
@@ -990,12 +995,11 @@ class ClosureCompilerPlugin {
     chunkDefs.set(safeChunkName, chunkDef);
 
     const forEachChildChunk = (childChunk) => {
-      nextUniqueId = this.addChunkToCompilationStandard(
+      this.addChunkToCompilationStandard(
         compilation,
         childChunk,
         [safeChunkName],
         chunkDefs,
-        nextUniqueId,
         entrypoints
       );
     };
@@ -1004,29 +1008,24 @@ class ClosureCompilerPlugin {
         childGroup.chunks.forEach(forEachChildChunk);
       }
     }
-
-    return nextUniqueId;
   }
 
   /**
    * Starting from an entry point, recursively traverse the chunk group tree and add
-   * all chunk sources to the compilation
+   * all chunk sources to the compilation.
    *
    * @param {?} compilation
    * @param {!Chunk} chunk
    * @param {!Array<!{src: string, path: string, sourceMap: (string|undefined)}>} sources
    * @param {!Array<string>} parentChunkNames - logical chunk parent of this tree
    * @param {!ChunkMap} chunkDefs
-   * @param {number} nextUniqueId
    * @param {!Array<string>} entrypoint modules
-   * @return {number} next safe unique id
    */
   addChunkToCompilationAggressive(
     compilation,
     chunk,
     parentChunkNames,
     chunkDefs,
-    nextUniqueId,
     entrypoints
   ) {
     const chunkName = this.getChunkName(compilation, chunk);
@@ -1038,7 +1037,7 @@ class ClosureCompilerPlugin {
           chunkDefs.get(safeChunkName).parentNames.add(parentName);
         });
       }
-      return nextUniqueId;
+      return;
     } else if (!chunk.files.includes(chunkName)) {
       chunk.files.push(chunkName);
       if (!compilation.assets[chunkName]) {
@@ -1070,17 +1069,7 @@ class ClosureCompilerPlugin {
       // put this at the front of the entrypoints so that Closure-compiler sorts the source to the top of the chunk
       entrypoints.unshift(childModulePathRegistrationSource.path);
     }
-    chunkSources.push(
-      ...getChunkSources(
-        chunk,
-        () => {
-          const newId = nextUniqueId;
-          nextUniqueId += 1;
-          return newId;
-        },
-        compilation
-      )
-    );
+    chunkSources.push(...getChunkSources(chunk, compilation));
 
     const chunkDef = {
       name: safeChunkName,
@@ -1096,7 +1085,6 @@ class ClosureCompilerPlugin {
       });
     }
     chunkDefs.set(safeChunkName, chunkDef);
-    return nextUniqueId;
   }
 
   getChildChunkPaths(

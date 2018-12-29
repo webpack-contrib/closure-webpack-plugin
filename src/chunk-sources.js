@@ -1,11 +1,14 @@
 const toSafePath = require('./safe-path');
 const getWebpackModuleName = require('./module-name');
 
-module.exports = function getChunkSources(chunk, getUniqueId, compilation) {
+let uniqueId = 1;
+module.exports = function getChunkSources(chunk, compilation) {
   if (chunk.isEmpty()) {
+    const emptyId = uniqueId;
+    uniqueId += 1;
     return [
       {
-        path: `__empty_${getUniqueId()}__`,
+        path: `__empty_${emptyId}__`,
         src: '',
       },
     ];

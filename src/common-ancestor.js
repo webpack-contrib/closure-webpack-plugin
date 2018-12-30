@@ -91,7 +91,20 @@ function findNearestCommonParentChunk(
         distance: -1,
       };
     }
-    chunkDef.parentNames.forEach((chunkParentName) => {
+    let nextParents = chunkDef.parentNames;
+    // If a chunk has more than one parent, we can only assume that one of them has been
+    // loaded. But we don't know which one. So we have to keep going up the tree by
+    // finding a common ancestor of the parents.
+    if (nextParents.size > 1) {
+      const commonParent = findNearestCommonParentChunk(
+        chunkDefMap,
+        Array.from(nextParents),
+        0
+      );
+      nextParents = new Set([commonParent.name]);
+    }
+
+    nextParents.forEach((chunkParentName) => {
       const distanceRecord = findNearestCommonParentChunk(
         chunkDefMap,
         [chunkParentName].concat(chunkNames.slice(1)),

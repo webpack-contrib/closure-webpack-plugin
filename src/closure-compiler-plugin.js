@@ -614,6 +614,15 @@ class ClosureCompilerPlugin {
           }
         });
         targetChunkDef.sources.push(srcInfo);
+        compilation.warnings.push(
+          new Error(
+            `${PLUGIN.name}: ${
+              srcInfo.path
+            } is included in chunks ${JSON.stringify(
+              Array.from(sourceChunks)
+            )}. Moving it to ${targetChunkDef.name} to avoid code duplication.`
+          )
+        );
       }
     });
 

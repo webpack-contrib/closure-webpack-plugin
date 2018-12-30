@@ -91,7 +91,9 @@ const bar = require('bar');
 Aggressive Bundle Mode utilizes a custom runtime in which modules within a chunk file are all included in the same scope.
 This avoids [the cost of small modules](https://nolanlawson.com/2016/08/15/the-cost-of-small-modules/).
 
-In Aggressive Bundle Mode, a file can only appear in a single output chunk. Use the [Split Chunks Plugin](https://webpack.js.org/plugins/split-chunks-plugin/) to split duplicated files into a single output chunk.
+In Aggressive Bundle Mode, a file can only appear in a single output chunk. Use the [Split Chunks Plugin](https://webpack.js.org/plugins/split-chunks-plugin/)
+to split duplicated files into a single output chunk. If a module is utilized by more than one chunk, the
+plugin will move it up to the first common parent to prevent code duplication.
 
 The [concatenatedModules optimization](https://webpack.js.org/configuration/optimization/#optimization-concatenatemodules)
 is not compatible with this mode since Closure-Compiler performs an equivalent optimization).
@@ -113,7 +115,7 @@ for an example.
 ## Other tips for Use
  * Don't use babel at the same time - closure-compiler is also a transpiler.
    If you need [features not yet supported](https://github.com/google/closure-compiler/wiki/ECMAScript6) by closure-compiler, have babel
-   only target those features. 
+   only target those features. Closure Compiler can transpile async/await - you don't need babel for that functionality either.
 
 # Closure Library Plugin
 In order for webpack to recognize `goog.require`, `goog.provide`, `goog.module` and related primitives,
@@ -141,7 +143,8 @@ This is typically used during development mode. When the webpack mode is `produc
 only dependency information is provided to webpack as Closure Compiler will natively recognize
 the Closure Library primitives.
 
-The Closure Library Plugin is only compatible with the `AGGRESSIVE_BUNDLE` mode of the Closure-Compiler webpack plugin.
+The Closure Library Plugin is only compatible with the `AGGRESSIVE_BUNDLE` mode of the Closure-Compiler
+webpack plugin.
 
 ## Options
 

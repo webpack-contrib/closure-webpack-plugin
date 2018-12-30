@@ -286,6 +286,12 @@ class ClosureCompilerPlugin {
   }
 
   optimizeChunkAssets_(compilation, originalChunks, cb) {
+    // Early exit - don't wait for closure compiler to display errors
+    if (compilation.errors.length > 0) {
+      cb();
+      return;
+    }
+
     if (this.options.mode === 'AGGRESSIVE_BUNDLE') {
       this.aggressiveBundle(compilation, originalChunks, cb);
     } else {
@@ -658,7 +664,7 @@ class ClosureCompilerPlugin {
             null,
             null
           );
-          // Concatenate our synthentic root chunk with an entry point
+          // Concatenate our synthetic root chunk with an entry point
           if (chunk.hasRuntime()) {
             newSource = new ConcatSource(baseSrc, newSource);
           }

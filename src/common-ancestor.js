@@ -56,16 +56,9 @@ function findNearestCommonParentChunk(chunkGroups, currentDistance = 0) {
     }
   }
   if (distances.size === 0) {
-    let nextParents = chunkGroups[0].getParents();
-    // If a chunk has more than one parent, we can only assume that one of them has been
-    // loaded. But we don't know which one. So we have to keep going up the tree by
-    // finding a common ancestor of the parents.
-    if (nextParents.length > 1) {
-      const commonParent = findNearestCommonParentChunk(nextParents, 0);
-      nextParents = [commonParent.chunkGroup];
-    }
-
-    nextParents.forEach((chunkGroupParent) => {
+    // chunkGroup[0] was not a parent for the other chunk groups.
+    // So move up the graph one level and check again.
+    chunkGroups[0].getParents().forEach((chunkGroupParent) => {
       const distanceRecord = findNearestCommonParentChunk(
         [chunkGroupParent].concat(chunkGroups.slice(1)),
         currentDistance + 1

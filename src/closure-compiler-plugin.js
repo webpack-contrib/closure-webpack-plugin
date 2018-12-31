@@ -260,7 +260,7 @@ class ClosureCompilerPlugin {
     compilation.hooks.optimizeChunkAssets.tapAsync(
       PLUGIN,
       (originalChunks, cb) =>
-        this.optimizeChunkAssets_(compilation, originalChunks, cb)
+        this.optimizeChunkAssets(compilation, originalChunks, cb)
     );
   }
 
@@ -301,7 +301,7 @@ class ClosureCompilerPlugin {
   }
 
   /**
-   * Add the synthetic root module and ensure that a module only exists in a single output chunk.
+   * Add the synthetic root chunk and ensure that a module only exists in a single output chunk.
    *
    * @param {!Compilation} compilation
    * @param {!Set<!Chunk>} chunks
@@ -312,7 +312,12 @@ class ClosureCompilerPlugin {
 
     /** @type {!Map<!Module, !Set<!ChunkGroup>>} */
     const moduleChunks = new Map();
+
+    // Create a map of every module to all chunk groups which
+    // reference it.
     chunkGroups.forEach((chunkGroup) => {
+      // Add the new synthetic base chunk group as a parent
+      // for any entrypoints.
       if (chunkGroup.getParents().length === 0) {
         chunkGroup.addParent(requiredBase);
         requiredBase.addChild(chunkGroup);
@@ -326,6 +331,8 @@ class ClosureCompilerPlugin {
         });
       });
     });
+
+    // Add the synthetic base chunk group to the compilation
     const baseChunk = new Chunk(BASE_CHUNK_NAME);
     baseChunk.addGroup(requiredBase);
     requiredBase.pushChunk(baseChunk);
@@ -363,7 +370,7 @@ class ClosureCompilerPlugin {
     });
   }
 
-  optimizeChunkAssets_(compilation, originalChunks, cb) {
+  optimizeChunkAssets(compilation, originalChunks, cb) {
     // Early exit - don't wait for closure compiler to display errors
     if (compilation.errors.length > 0) {
       cb();
@@ -613,12 +620,11 @@ class ClosureCompilerPlugin {
     let baseChunkDef;
     if (baseChunk) {
       for (const [chunkDefName, chunkDef] of chunkDefs) {
-        if (baseChunk.files.includes(`${chunkDefName}.js`)) {
+        if (chunkDefName.indexOf(BASE_CHUNK_NAME) >= 0) {
           baseChunkDef = chunkDef;
           break;
         }
       }
-      delete compilation.assets[`${baseChunkDef.name}.js`];
     } else {
       baseChunkDef = chunkDefs.get(BASE_CHUNK_NAME);
     }
@@ -674,44 +680,55 @@ class ClosureCompilerPlugin {
       .then((outputFiles) => {
         // Find the synthetic root chunk
         const baseFile = outputFiles.find((file) =>
-          /required-base/.test(file.path)
+          file.path.indexOf(BASE_CHUNK_NAME)
         );
         let baseSrc = `${baseFile.src}\n`;
         if (/^['"]use strict['"];\s*$/.test(baseFile.src)) {
           baseSrc = '';
         }
 
-        outputFiles.forEach((outputFile) => {
-          const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
-          let chunkId;
-          if (chunkIdParts) {
-            chunkId = parseInt(chunkIdParts[1], 10);
-          }
-          const chunk = compilation.chunks.find((chunk_) =>
-            findChunkFile(chunk_, chunkId, outputFile.path)
-          );
-          if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
-            return;
-          }
-          const assetName = findChunkFile(chunk, chunkId, outputFile.path);
-          const sourceMap = JSON.parse(
-            outputFile.source_map || outputFile.sourceMap
-          );
-          sourceMap.file = assetName;
-          const source = outputFile.src;
-          let newSource = new SourceMapSource(
-            source,
-            assetName,
-            sourceMap,
-            null,
-            null
-          );
-          // Concatenate our synthetic root chunk with an entry point
-          if (chunk.hasRuntime()) {
-            newSource = new ConcatSource(baseSrc, newSource);
-          }
-          compilation.assets[assetName] = newSource;
-        });
+        // Remove any assets created by the synthetic base chunk
+        // They are concatenated on to each entry point.
+        if (baseChunk) {
+          baseChunk.files.forEach((baseFile) => {
+            delete compilation.assets[baseFile];
+          });
+          baseChunk.files.splice(0, baseChunk.files.length);
+        }
+
+        outputFiles
+          .filter((outputFile) => outputFile.path !== baseFile.path)
+          .forEach((outputFile) => {
+            const chunkIdParts = /chunk-(\d+)\.js/.exec(outputFile.path);
+            let chunkId;
+            if (chunkIdParts) {
+              chunkId = parseInt(chunkIdParts[1], 10);
+            }
+            const chunk = compilation.chunks.find((chunk_) =>
+              findChunkFile(chunk_, chunkId, outputFile.path)
+            );
+            if (!chunk || (chunk.isEmpty() && chunk.files.length === 0)) {
+              return;
+            }
+            const assetName = findChunkFile(chunk, chunkId, outputFile.path);
+            const sourceMap = JSON.parse(
+              outputFile.source_map || outputFile.sourceMap
+            );
+            sourceMap.file = assetName;
+            const source = outputFile.src;
+            let newSource = new SourceMapSource(
+              source,
+              assetName,
+              sourceMap,
+              null,
+              null
+            );
+            // Concatenate our synthetic root chunk with an entry point
+            if (chunk.hasRuntime()) {
+              newSource = new ConcatSource(baseSrc, newSource);
+            }
+            compilation.assets[assetName] = newSource;
+          });
 
         cb();
       })
@@ -1081,7 +1098,10 @@ class ClosureCompilerPlugin {
         });
       }
       return;
-    } else if (!chunk.files.includes(chunkName)) {
+    } else if (
+      !chunk.files.includes(chunkName) &&
+      chunk.name !== BASE_CHUNK_NAME
+    ) {
       chunk.files.push(chunkName);
       if (!compilation.assets[chunkName]) {
         compilation.assets[chunkName] = new RawSource('');

@@ -1,43 +1,21 @@
 /**
- * @typedef {Map<string, {
- *   name:string,
- *   parentNames:!Set<string>,
- *   sources: !Array<{path: string, source: string: sourceMap: string}>,
- *   outputWrapper: (string|undefined)
- * }>}
- */
-var ChunkMap;
-
-/**
  * Find an ancestor of a chunk. Return the distance from the target or -1 if not found.
  *
- * @param {!ChunkMap} chunkDefMap
- * @param {string} chunkName
- * @param {string} targetName
+ * @param {string} src
+ * @param {string} target
  * @param {number} currentDistance
  * @return {number} distance from target of parent or -1 when not found
  */
-function findAncestorDistance(
-  chunkDefMap,
-  chunkName,
-  targetName,
-  currentDistance
-) {
-  if (targetName === chunkName) {
+function findAncestorDistance(src, target, currentDistance) {
+  if (target === src) {
     return currentDistance;
   }
 
-  const chunkDef = chunkDefMap.get(chunkName);
-  if (!chunkDef) {
-    return -1;
-  }
-
   const distances = [];
-  chunkDef.parentNames.forEach((parentName) => {
+  src.getParents().forEach((srcParentChunkGroup) => {
     const distance = findAncestorDistance(
-      chunkDefMap,
-      parentName,
-      targetName,
+      srcParentChunkGroup,
+      target,
       currentDistance + 1
     );
     if (distance >= 0) {
@@ -55,81 +33,63 @@ function findAncestorDistance(
  * Since closure-compiler requires a chunk tree to have a single root,
  * there will always be a common parent.
  *
- * @param {!ChunkMap} chunkDefMap
- * @param {!Array<string>} chunkNames
+ * @param {!Array<string>} chunkGroups
  * @param {number} currentDistance
- * @return {{name: (string|undefined), distance: number}}
+ * @return {{chunkGroup: (!ChunkGroup|undefined), distance: number}}
  */
-function findNearestCommonParentChunk(
-  chunkDefMap,
-  chunkNames,
-  currentDistance = 0
-) {
+function findNearestCommonParentChunk(chunkGroups, currentDistance = 0) {
   // Map of chunk name to distance from target
   const distances = new Map();
-  for (let i = 1; i < chunkNames.length; i++) {
+  for (let i = 1; i < chunkGroups.length; i++) {
     const distance = findAncestorDistance(
-      chunkDefMap,
-      chunkNames[i],
-      chunkNames[0],
+      chunkGroups[i],
+      chunkGroups[0],
       currentDistance
     );
     if (distance < 0) {
-      distances.delete(chunkNames[0]);
+      distances.delete(chunkGroups[0]);
     } else if (
-      !distances.has(chunkNames[0]) ||
-      distance < distances.get(chunkNames[0])
+      !distances.has(chunkGroups[0]) ||
+      distance < distances.get(chunkGroups[0])
     ) {
-      distances.set(chunkNames[0], distance);
+      distances.set(chunkGroups[0], distance);
     }
   }
   if (distances.size === 0) {
-    const chunkDef = chunkDefMap.get(chunkNames[0]);
-    if (!chunkDef) {
-      return {
-        name: undefined,
-        distance: -1,
-      };
-    }
-    let nextParents = chunkDef.parentNames;
+    let nextParents = chunkGroups[0].getParents();
     // If a chunk has more than one parent, we can only assume that one of them has been
     // loaded. But we don't know which one. So we have to keep going up the tree by
     // finding a common ancestor of the parents.
-    if (nextParents.size > 1) {
-      const commonParent = findNearestCommonParentChunk(
-        chunkDefMap,
-        Array.from(nextParents),
-        0
-      );
-      nextParents = new Set([commonParent.name]);
+    if (nextParents.length > 1) {
+      const commonParent = findNearestCommonParentChunk(nextParents, 0);
+      nextParents = [commonParent.chunkGroup];
     }
 
-    nextParents.forEach((chunkParentName) => {
+    nextParents.forEach((chunkGroupParent) => {
       const distanceRecord = findNearestCommonParentChunk(
-        chunkDefMap,
-        [chunkParentName].concat(chunkNames.slice(1)),
+        [chunkGroupParent].concat(chunkGroups.slice(1)),
         currentDistance + 1
       );
       if (
         distanceRecord.distance >= 0 &&
-        (!distances.has(distanceRecord.name) ||
-          distances.get(distanceRecord.name) < distanceRecord.distance)
+        (!distances.has(distanceRecord.chunkGroup) ||
+          distances.get(distanceRecord.chunkGroup) < distanceRecord.distance)
       ) {
-        distances.set(distanceRecord.name, distanceRecord.distance);
+        distances.set(distanceRecord.chunkGroup, distanceRecord.distance);
       }
     });
   }
 
   const nearestCommonParent = {
-    name: undefined,
+    chunkGroup: undefined,
     distance: -1,
   };
-  distances.forEach((distance, chunkName) => {
+  distances.forEach((distance, chunkGroup) => {
     if (
       nearestCommonParent.distance < 0 ||
       distance < nearestCommonParent.distance
     ) {
-      nearestCommonParent.name = chunkName;
+      nearestCommonParent.chunkGroup = chunkGroup;
       nearestCommonParent.distance = distance;
     }
   });

@@ -6,6 +6,8 @@ const {
   getNativeImagePath,
 } = require('google-closure-compiler/lib/utils');
 const { ConcatSource, SourceMapSource, RawSource } = require('webpack-sources');
+const Chunk = require('webpack/lib/Chunk');
+const ChunkGroup = require('webpack/lib/ChunkGroup');
 const RequestShortener = require('webpack/lib/RequestShortener');
 const ModuleTemplate = require('webpack/lib/ModuleTemplate');
 const ClosureRuntimeTemplate = require('./closure-runtime-template');
@@ -23,6 +25,7 @@ const getWebpackModuleName = require('./module-name');
 const ClosureLibraryPlugin = require('./closure-library-plugin');
 const findNearestCommonParentChunk = require('./common-ancestor');
 
+const BASE_CHUNK_NAME = 'required-base';
 const ENTRY_CHUNK_WRAPPER =
   '(function(__wpcc){%s}).call(this || window, (window.__wpcc = window.__wpcc || {}));';
 
@@ -104,6 +107,8 @@ class ClosureCompilerPlugin {
         compilerFlags || {}
       );
     }
+
+    this.optimizedCompilations = new Set();
   }
 
   apply(compiler) {
@@ -231,6 +236,16 @@ class ClosureCompilerPlugin {
           }
         });
       });
+
+      compilation.hooks.afterOptimizeChunks.tap(
+        PLUGIN,
+        (chunks, chunkGroups) => {
+          if (!this.optimizedCompilations.has(compilation)) {
+            this.optimizedCompilations.add(compilation);
+            this.optimizeChunks(compilation, chunks, chunkGroups);
+          }
+        }
+      );
     }
 
     compilation.hooks.buildModule.tap(PLUGIN, (moduleArg) => {
@@ -281,6 +296,69 @@ class ClosureCompilerPlugin {
         markerDependencies.forEach((marker) =>
           webpackModule.removeDependency(marker)
         );
+      }
+    });
+  }
+
+  /**
+   * Add the synthetic root module and ensure that a module only exists in a single output chunk.
+   *
+   * @param {!Compilation} compilation
+   * @param {!Set<!Chunk>} chunks
+   * @param {!Set<!ChunkGroup>} chunkGroups
+   */
+  optimizeChunks(compilation, chunks, chunkGroups) {
+    const requiredBase = new ChunkGroup(BASE_CHUNK_NAME);
+
+    /** @type {!Map<!Module, !Set<!ChunkGroup>>} */
+    const moduleChunks = new Map();
+    chunkGroups.forEach((chunkGroup) => {
+      if (chunkGroup.getParents().length === 0) {
+        chunkGroup.addParent(requiredBase);
+        requiredBase.addChild(chunkGroup);
+      }
+      chunkGroup.chunks.forEach((chunk) => {
+        chunk.getModules().forEach((webpackModule) => {
+          if (!moduleChunks.has(webpackModule)) {
+            moduleChunks.set(webpackModule, new Set());
+          }
+          moduleChunks.get(webpackModule).add(chunkGroup);
+        });
+      });
+    });
+    const baseChunk = new Chunk(BASE_CHUNK_NAME);
+    baseChunk.addGroup(requiredBase);
+    requiredBase.pushChunk(baseChunk);
+    compilation.chunkGroups.push(requiredBase);
+    compilation.chunks.push(baseChunk);
+
+    // Find any module with more than 1 chunkGroup and move the module up the graph
+    // to the nearest common ancestor
+    moduleChunks.forEach((moduleChunkGroups, duplicatedModule) => {
+      if (chunkGroups.size < 2) {
+        return;
+      }
+      const commonParent = findNearestCommonParentChunk(
+        Array.from(moduleChunkGroups)
+      );
+      if (commonParent.distance >= 0) {
+        const targetChunkGroup = compilation.chunkGroups.find(
+          (chunkGroup) => chunkGroup === commonParent.chunkGroup
+        );
+        if (!targetChunkGroup) {
+          return;
+        }
+        moduleChunkGroups.forEach((moduleChunkGroup) => {
+          const targetChunks = moduleChunkGroup.chunks.filter((chunk) =>
+            chunk.getModules().includes(duplicatedModule)
+          );
+          if (targetChunks.length > 0) {
+            targetChunks.forEach((chunk) =>
+              chunk.removeModule(duplicatedModule)
+            );
+          }
+        });
+        targetChunkGroup.chunks[0].addModule(duplicatedModule);
       }
     });
   }
@@ -420,33 +498,21 @@ class ClosureCompilerPlugin {
     // Closure compiler requires the chunk graph to have a single root node.
     // Since webpack can have multiple entry points, add a synthetic root
     // to the graph.
-    const BASE_CHUNK_NAME = 'required-base';
     /** @type {!ChunkMap} */
-    const chunkDefs = new Map([
-      [
-        BASE_CHUNK_NAME,
-        {
-          name: BASE_CHUNK_NAME,
-          parentNames: new Set(),
-          sources: [
-            {
-              path: externsPath,
-              src: fs.readFileSync(externsPath, 'utf8'),
-            },
-            {
-              path: basicRuntimePath,
-              src: fs.readFileSync(basicRuntimePath, 'utf8'),
-            },
-          ],
-          outputWrapper: ENTRY_CHUNK_WRAPPER,
-        },
-      ],
-    ]);
+    const chunkDefs = new Map();
+    const baseChunk = originalChunks.find(
+      (chunk) => chunk.name === BASE_CHUNK_NAME
+    );
+    if (!baseChunk) {
+      chunkDefs.set(BASE_CHUNK_NAME, {
+        name: BASE_CHUNK_NAME,
+        parentNames: new Set(),
+        sources: [],
+        outputWrapper: ENTRY_CHUNK_WRAPPER,
+      });
+    }
     let jsonpRuntimeRequired = false;
-    const entrypoints = chunkDefs
-      .get(BASE_CHUNK_NAME)
-      .sources.slice(1)
-      .map((source) => source.path);
+    const entrypoints = [];
 
     compilation.chunkGroups.forEach((chunkGroup) => {
       // If a chunk is split by the SplitChunksPlugin, the original chunk name
@@ -465,7 +531,9 @@ class ClosureCompilerPlugin {
 
       // Entrypoints are chunk groups with no parents
       if (primaryChunk && primaryChunk.entryModule) {
-        primaryParentNames.push(BASE_CHUNK_NAME);
+        if (!baseChunk) {
+          primaryParentNames.push(BASE_CHUNK_NAME);
+        }
         const entryModuleDeps =
           primaryChunk.entryModule.type === 'multi entry'
             ? primaryChunk.entryModule.dependencies
@@ -474,10 +542,12 @@ class ClosureCompilerPlugin {
           entrypoints.push(toSafePath(getWebpackModuleName(entryDep)));
         });
       } else if (chunkGroup.getParents().length === 0) {
-        if (secondaryChunks.size > 0) {
-          secondaryParentNames.push(BASE_CHUNK_NAME);
-        } else if (primaryChunk) {
-          primaryParentNames.push(BASE_CHUNK_NAME);
+        if (!baseChunk) {
+          if (secondaryChunks.size > 0) {
+            secondaryParentNames.push(BASE_CHUNK_NAME);
+          } else if (primaryChunk) {
+            primaryParentNames.push(BASE_CHUNK_NAME);
+          }
         }
       } else {
         jsonpRuntimeRequired = true;
@@ -540,12 +610,37 @@ class ClosureCompilerPlugin {
       }
     });
 
+    let baseChunkDef;
+    if (baseChunk) {
+      for (const [chunkDefName, chunkDef] of chunkDefs) {
+        if (baseChunk.files.includes(`${chunkDefName}.js`)) {
+          baseChunkDef = chunkDef;
+          break;
+        }
+      }
+      delete compilation.assets[`${baseChunkDef.name}.js`];
+    } else {
+      baseChunkDef = chunkDefs.get(BASE_CHUNK_NAME);
+    }
+    baseChunkDef.sources.unshift(
+      {
+        path: externsPath,
+        src: fs.readFileSync(externsPath, 'utf8'),
+      },
+      {
+        path: basicRuntimePath,
+        src: fs.readFileSync(basicRuntimePath, 'utf8'),
+      }
+    );
+    baseChunkDef.outputWrapper = ENTRY_CHUNK_WRAPPER;
+    entrypoints.unshift(basicRuntimePath);
+
     if (jsonpRuntimeRequired) {
       const fullRuntimeSource = this.renderRuntime();
-      const baseChunk = chunkDefs.get(BASE_CHUNK_NAME);
-      baseChunk.sources.push(fullRuntimeSource);
-      entrypoints.push(fullRuntimeSource.path);
+      baseChunkDef.sources.push(fullRuntimeSource);
+      entrypoints.unshift(fullRuntimeSource.path);
     }
+    entrypoints.unshift(basicRuntimePath);
 
     const defines = [];
     if (this.compilerFlags.define) {
@@ -563,68 +658,6 @@ class ClosureCompilerPlugin {
       hash: compilation.hash,
     });
     defines.push(`_WEBPACK_PUBLIC_PATH_='${PUBLIC_PATH}'`);
-
-    // Build a map of every source and any chunks that reference it
-    /** @type {!Map<string, !Set<string>>} */
-    const sourceChunkMap = new Map();
-    chunkDefs.forEach((chunkDef) => {
-      chunkDef.sources.forEach((srcInfo) => {
-        let sourceChunks = sourceChunkMap.get(srcInfo.path);
-        if (!sourceChunks) {
-          sourceChunks = new Set();
-          sourceChunkMap.set(srcInfo.path, sourceChunks);
-        }
-        sourceChunks.add(chunkDef.name);
-      });
-    });
-
-    // Find any sources with more than 1 chunk and move the source up the graph
-    // to the nearest common ancestor
-    sourceChunkMap.forEach((sourceChunks, sourcePath) => {
-      if (sourceChunks.size < 2) {
-        return;
-      }
-      const chunks = Array.from(sourceChunks);
-      const commonParent = findNearestCommonParentChunk(chunkDefs, chunks);
-      if (commonParent.distance >= 0) {
-        const targetChunkDef = chunkDefs.get(commonParent.name);
-        if (!targetChunkDef) {
-          return;
-        }
-        const firstChunkDef = chunkDefs.get(chunks[0]);
-        if (!firstChunkDef) {
-          return;
-        }
-        const srcInfo = firstChunkDef.sources.find(
-          (srcInfo) => srcInfo.path === sourcePath
-        );
-        if (!srcInfo) {
-          return;
-        }
-        sourceChunks.forEach((chunkName) => {
-          const chunkDef = chunkDefs.get(chunkName);
-          if (!chunkName) {
-            return;
-          }
-          const srcIndex = chunkDef.sources.findIndex(
-            (srcInfo) => srcInfo.path === sourcePath
-          );
-          if (srcIndex >= 0) {
-            chunkDef.sources.splice(srcIndex, 1);
-          }
-        });
-        targetChunkDef.sources.push(srcInfo);
-        compilation.warnings.push(
-          new Error(
-            `${PLUGIN.name}: ${
-              srcInfo.path
-            } is included in chunks ${JSON.stringify(
-              Array.from(sourceChunks)
-            )}. Moving it to ${targetChunkDef.name} to avoid code duplication.`
-          )
-        );
-      }
-    });
 
     const allSources = [];
     const compilationOptions = this.buildCompilerOptions(

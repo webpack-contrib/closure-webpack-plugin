@@ -507,10 +507,37 @@ class ClosureCompilerPlugin {
     // to the graph.
     /** @type {!ChunkMap} */
     const chunkDefs = new Map();
+    const entrypoints = [];
     const baseChunk = originalChunks.find(
       (chunk) => chunk.name === BASE_CHUNK_NAME
     );
-    if (!baseChunk) {
+    let { chunkGroups } = compilation;
+    if (baseChunk) {
+      baseChunk.files.forEach((chunkFile) => {
+        delete compilation.assets[chunkFile];
+      });
+      baseChunk.files.splice(0, baseChunk.files.length);
+      const baseChunkGroup = compilation.chunkGroups.find(
+        (chunkGroup) => chunkGroup.name === BASE_CHUNK_NAME
+      );
+      Array.from(baseChunkGroup.getChildren())
+        .slice()
+        .forEach((childChunk) => {
+          childChunk.removeParent(baseChunkGroup);
+          baseChunkGroup.removeChild(childChunk);
+        });
+
+      this.addChunkToCompilationAggressive(
+        compilation,
+        baseChunk,
+        [],
+        chunkDefs,
+        entrypoints
+      );
+      chunkGroups = chunkGroups.filter(
+        (chunkGroup) => chunkGroup !== baseChunkGroup
+      );
+    } else {
       chunkDefs.set(BASE_CHUNK_NAME, {
         name: BASE_CHUNK_NAME,
         parentNames: new Set(),
@@ -518,10 +545,10 @@ class ClosureCompilerPlugin {
         outputWrapper: ENTRY_CHUNK_WRAPPER,
       });
     }
-    let jsonpRuntimeRequired = false;
-    const entrypoints = [];
 
-    compilation.chunkGroups.forEach((chunkGroup) => {
+    let jsonpRuntimeRequired = false;
+
+    chunkGroups.forEach((chunkGroup) => {
       // If a chunk is split by the SplitChunksPlugin, the original chunk name
       // will be set as the chunk group name.
       const primaryChunk = chunkGroup.chunks.find(
@@ -1088,7 +1115,10 @@ class ClosureCompilerPlugin {
     chunkDefs,
     entrypoints
   ) {
-    const chunkName = this.getChunkName(compilation, chunk);
+    const chunkName =
+      chunk.name === BASE_CHUNK_NAME
+        ? BASE_CHUNK_NAME
+        : this.getChunkName(compilation, chunk);
     const safeChunkName = chunkName.replace(/\.js$/, '');
 
     if (chunkDefs.has(safeChunkName)) {

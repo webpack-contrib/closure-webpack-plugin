@@ -550,8 +550,9 @@ Use the CommonsChunkPlugin to ensure a module exists in only one bundle.`,
         error_format: 'JSON',
         json_streams: 'BOTH',
       });
+      const { extraCommandArgs, ...opts } = flags;
       const { compiler: ClosureCompiler } = googleClosureCompiler;
-      const compilerRunner = new ClosureCompiler(flags);
+      const compilerRunner = new ClosureCompiler(opts, extraCommandArgs);
       compilerRunner.spawnOptions = { stdio: 'pipe' };
       if (platform.toLowerCase() === 'native') {
         compilerRunner.JAR_PATH = null;

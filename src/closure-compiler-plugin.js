@@ -94,6 +94,10 @@ class ClosureCompilerPlugin {
       this.options.platform = [this.options.platform];
     }
 
+    if (!Array.isArray(this.options.extraCommandArgs)) {
+      this.options.extraCommandArgs = [this.options.extraCommandArgs];
+    }
+
     if (this.options.mode === 'STANDARD') {
       this.compilerFlags = Object.assign(
         {},
@@ -892,7 +896,10 @@ class ClosureCompilerPlugin {
         json_streams: 'BOTH',
       });
       const { compiler: ClosureCompiler } = googleClosureCompiler;
-      const compilerRunner = new ClosureCompiler(flags);
+      const compilerRunner = new ClosureCompiler(
+        flags,
+        this.options.extraCommandArgs
+      );
       compilerRunner.spawnOptions = { stdio: 'pipe' };
       if (platform.toLowerCase() === 'native') {
         compilerRunner.JAR_PATH = null;
@@ -1305,6 +1312,7 @@ ClosureCompilerPlugin.DEFAULT_OPTIONS = {
   mode: 'STANDARD',
   platform: ['native', 'java', 'javascript'],
   test: /\.js(\?.*)?$/i,
+  extraCommandArgs: [],
 };
 
 /** @const */

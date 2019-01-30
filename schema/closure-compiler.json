@@ -109,6 +109,17 @@
           "type": "array"
         }
       ]
+    },
+    "extraCommandArgs": {
+      "description": "Extra command arguments passed to java version of closure-compiler",
+      "oneOf": [{
+        "type": "string"
+      }, {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }]
     }
   }
 }

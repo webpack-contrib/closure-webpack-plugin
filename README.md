@@ -21,7 +21,7 @@ For webpack 3 support, see https://github.com/webpack-contrib/closure-webpack-pl
 You must install both the google-closure-compiler package as well as the closure-webpack-plugin.
 
 ```
-npm install --save-dev closure-webpack-plugin@next google-closure-compiler@webpack-beta
+npm install --save-dev closure-webpack-plugin google-closure-compiler
 ```
 
 ## Usage example

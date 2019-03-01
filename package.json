@@ -1,9 +1,6 @@
 {
   "name": "closure-webpack-plugin",
   "version": "2.0.0-rc.18",
-  "publishConfig": {
-    "tag": "next"
-  },
   "description": "Webpack Google Closure Compiler and Closure Library plugin",
   "author": "Chad Killingsworth (@ChadKillingsworth)",
   "license": "MIT",
@@ -47,7 +44,7 @@
     "eslint": "^4.19.1",
     "eslint-plugin-import": "^2.8.0",
     "eslint-plugin-prettier": "^2.4.0",
-    "google-closure-compiler": "20181231.0.0-webpack-beta",
+    "google-closure-compiler": ">=20190215.0.1",
     "husky": "^0.14.3",
     "jest": "^24.1.0",
     "lint-staged": "^4.2.3",
@@ -55,7 +52,7 @@
     "pre-commit": "^1.2.2",
     "prettier": "^1.9.2",
     "standard-version": "^4.4.0",
-    "webpack": "^4.17.2"
+    "webpack": "4.x"
   },
   "engines": {
     "node": ">= 6.9.0 || >= 8.9.0"

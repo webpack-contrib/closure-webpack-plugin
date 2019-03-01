@@ -4,7 +4,7 @@
 
 This plugin supports the use of Google's Closure Tools with webpack.
 
-**Note: This is the webpack 4 prelease branch.**
+**Note: This is the webpack 4 branch.**
 
 [Closure-Compiler](https://developers.google.com/closure/compiler/) is a full optimizing compiler and transpiler.
 It offers unmatched optimizations, provides type checking and can easily target transpilation to different versions of ECMASCRIPT.

@@ -4,6 +4,9 @@
   "description": "Webpack Google Closure Compiler and Closure Library plugin",
   "author": "Chad Killingsworth (@ChadKillingsworth)",
   "license": "MIT",
+  "publishConfig": {
+    "tag": "webpack3"
+  },
   "main": "src/index.js",
   "files": [
     "src",
@@ -34,32 +37,31 @@
     "webpack-sources": "^1.0.1"
   },
   "devDependencies": {
-    "@commitlint/cli": "^5.2.6",
-    "@commitlint/config-angular": "^5.1.1",
-    "@webpack-contrib/eslint-config-webpack": "^2.0.2",
-    "babel-core": "^6.26.3",
-    "babel-jest": "^22.0.4",
-    "babel-preset-env": "^1.7.0",
-    "conventional-github-releaser": "^2.0.0",
-    "del": "^3.0.0",
-    "eslint": "^4.19.1",
-    "eslint-plugin-import": "^2.8.0",
-    "eslint-plugin-prettier": "^2.4.0",
+    "@commitlint/cli": "5.x",
+    "@commitlint/config-angular": "5.x",
+    "@webpack-contrib/eslint-config-webpack": "2.x",
+    "babel-core": "6.x",
+    "babel-jest": "22.x",
+    "babel-preset-env": "1.x",
+    "conventional-github-releaser": "2.x",
+    "del": "3.x",
+    "eslint": "4.x",
+    "eslint-plugin-import": "2.x",
+    "eslint-plugin-prettier": "2.x",
     "husky": "^0.14.3",
     "jest": "^23.6.0",
     "lint-staged": "^4.2.3",
     "memory-fs": "^0.4.1",
-    "nsp": "^3.2.1",
-    "pre-commit": "^1.2.2",
-    "prettier": "^1.9.2",
-    "standard-version": "^4.4.0",
+    "pre-commit": "1.x",
+    "prettier": "^1.x",
+    "standard-version": "4.x",
     "webpack": "^3.10.0"
   },
   "engines": {
     "node": ">= 6.9.0 || >= 8.9.0"
   },
   "peerDependencies": {
-    "webpack": "^3.0.0 || ^4.0.0"
+    "webpack": "3.x"
   },
   "homepage": "https://github.com/webpack-contrib/closure-webpack-plugin",
   "repository": "https://github.com/webpack-contrib/closure-webpack-plugin",

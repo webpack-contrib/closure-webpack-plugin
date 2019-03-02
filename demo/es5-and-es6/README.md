@@ -1,6 +1,6 @@
 # Multiple output languages demo
 
-This is a demo showing how the webpack-closure-plugin can be used to output both
+This is a demo showing how the closure-webpack-plugin can be used to output both
 ES5 and ES6 transpiled JS with a single webpack build. The language polyfills are only
 added to the ES5 build.
 

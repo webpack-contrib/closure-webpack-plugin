@@ -44,7 +44,7 @@ module.exports = (env, argv) => {
     plugins: [
       new CopyWebpackPlugin([{
         from: path.resolve(__dirname, './node_modules/@webcomponents/webcomponentsjs/**/*.js'),
-        to: path.resolve(__dirname, 'public', 'js', 'webcomponentsjs', '[name].[ext]')
+        to: path.resolve(__dirname, 'public', 'js', 'webcomponentsjs')
       }])
     ]
   };

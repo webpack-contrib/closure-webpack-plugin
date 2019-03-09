@@ -25,7 +25,6 @@ const getWebpackModuleName = require('./module-name');
 const ClosureLibraryPlugin = require('./closure-library-plugin');
 const findNearestCommonParentChunk = require('./common-ancestor');
 
-const BASE_CHUNK_NAME = 'required-base';
 const ENTRY_CHUNK_WRAPPER =
   '(function(__wpcc){%s}).call(this || window, (window.__wpcc = window.__wpcc || {}));';
 
@@ -68,6 +67,7 @@ function findChunkFile(chunk, chunkId, outputFilePath) {
   return undefined; // eslint-disable-line no-undefined
 }
 
+let baseChunkCount = 1;
 const PLUGIN = { name: 'closure-compiler-plugin' };
 
 class ClosureCompilerPlugin {
@@ -113,6 +113,8 @@ class ClosureCompilerPlugin {
     }
 
     this.optimizedCompilations = new Set();
+    this.BASE_CHUNK_NAME = `required-base-${baseChunkCount}`;
+    baseChunkCount += 1;
   }
 
   apply(compiler) {
@@ -312,7 +314,7 @@ class ClosureCompilerPlugin {
    * @param {!Set<!ChunkGroup>} chunkGroups
    */
   optimizeChunks(compilation, chunks, chunkGroups) {
-    const requiredBase = new ChunkGroup(BASE_CHUNK_NAME);
+    const requiredBase = new ChunkGroup(this.BASE_CHUNK_NAME);
 
     /** @type {!Map<!Module, !Set<!ChunkGroup>>} */
     const moduleChunks = new Map();
@@ -337,7 +339,7 @@ class ClosureCompilerPlugin {
     });
 
     // Add the synthetic base chunk group to the compilation
-    const baseChunk = new Chunk(BASE_CHUNK_NAME);
+    const baseChunk = new Chunk(this.BASE_CHUNK_NAME);
     baseChunk.addGroup(requiredBase);
     requiredBase.pushChunk(baseChunk);
     compilation.chunkGroups.push(requiredBase);
@@ -513,7 +515,7 @@ class ClosureCompilerPlugin {
     const chunkDefs = new Map();
     const entrypoints = [];
     const baseChunk = originalChunks.find(
-      (chunk) => chunk.name === BASE_CHUNK_NAME
+      (chunk) => chunk.name === this.BASE_CHUNK_NAME
     );
     let { chunkGroups } = compilation;
     if (baseChunk) {
@@ -522,7 +524,7 @@ class ClosureCompilerPlugin {
       });
       baseChunk.files.splice(0, baseChunk.files.length);
       const baseChunkGroup = compilation.chunkGroups.find(
-        (chunkGroup) => chunkGroup.name === BASE_CHUNK_NAME
+        (chunkGroup) => chunkGroup.name === this.BASE_CHUNK_NAME
       );
       Array.from(baseChunkGroup.getChildren())
         .slice()
@@ -542,8 +544,8 @@ class ClosureCompilerPlugin {
         (chunkGroup) => chunkGroup !== baseChunkGroup
       );
     } else {
-      chunkDefs.set(BASE_CHUNK_NAME, {
-        name: BASE_CHUNK_NAME,
+      chunkDefs.set(this.BASE_CHUNK_NAME, {
+        name: this.BASE_CHUNK_NAME,
         parentNames: new Set(),
         sources: [],
         outputWrapper: ENTRY_CHUNK_WRAPPER,
@@ -570,7 +572,7 @@ class ClosureCompilerPlugin {
       // Entrypoints are chunk groups with no parents
       if (primaryChunk && primaryChunk.entryModule) {
         if (!baseChunk) {
-          primaryParentNames.push(BASE_CHUNK_NAME);
+          primaryParentNames.push(this.BASE_CHUNK_NAME);
         }
         const entryModuleDeps =
           primaryChunk.entryModule.type === 'multi entry'
@@ -582,9 +584,9 @@ class ClosureCompilerPlugin {
       } else if (chunkGroup.getParents().length === 0) {
         if (!baseChunk) {
           if (secondaryChunks.size > 0) {
-            secondaryParentNames.push(BASE_CHUNK_NAME);
+            secondaryParentNames.push(this.BASE_CHUNK_NAME);
           } else if (primaryChunk) {
-            primaryParentNames.push(BASE_CHUNK_NAME);
+            primaryParentNames.push(this.BASE_CHUNK_NAME);
           }
         }
       } else {
@@ -651,13 +653,13 @@ class ClosureCompilerPlugin {
     let baseChunkDef;
     if (baseChunk) {
       for (const [chunkDefName, chunkDef] of chunkDefs) {
-        if (chunkDefName.indexOf(BASE_CHUNK_NAME) >= 0) {
+        if (chunkDefName.indexOf(this.BASE_CHUNK_NAME) >= 0) {
           baseChunkDef = chunkDef;
           break;
         }
       }
     } else {
-      baseChunkDef = chunkDefs.get(BASE_CHUNK_NAME);
+      baseChunkDef = chunkDefs.get(this.BASE_CHUNK_NAME);
     }
     baseChunkDef.sources.unshift(
       {
@@ -711,7 +713,7 @@ class ClosureCompilerPlugin {
       .then((outputFiles) => {
         // Find the synthetic root chunk
         const baseFile = outputFiles.find((file) =>
-          file.path.indexOf(BASE_CHUNK_NAME)
+          file.path.indexOf(this.BASE_CHUNK_NAME)
         );
         let baseSrc = `${baseFile.src}\n`;
         if (/^['"]use strict['"];\s*$/.test(baseFile.src)) {
@@ -1123,8 +1125,8 @@ class ClosureCompilerPlugin {
     entrypoints
   ) {
     const chunkName =
-      chunk.name === BASE_CHUNK_NAME
-        ? BASE_CHUNK_NAME
+      chunk.name === this.BASE_CHUNK_NAME
+        ? this.BASE_CHUNK_NAME
         : this.getChunkName(compilation, chunk);
     const safeChunkName = chunkName.replace(/\.js$/, '');
 
@@ -1137,7 +1139,7 @@ class ClosureCompilerPlugin {
       return;
     } else if (
       !chunk.files.includes(chunkName) &&
-      chunk.name !== BASE_CHUNK_NAME
+      chunk.name !== this.BASE_CHUNK_NAME
     ) {
       chunk.files.push(chunkName);
       if (!compilation.assets[chunkName]) {

@@ -126,7 +126,7 @@ const ClosurePlugin = require('closure-webpack-plugin');
 
 module.exports = {
   plugins: [
-    new ClosurePlugin.ClosureLibrary({
+    new ClosurePlugin.LibraryPlugin({
       closureLibraryBase: require.resolve(
         'google-closure-library/closure/goog/base'
       ),

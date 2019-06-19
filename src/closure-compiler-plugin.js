@@ -454,7 +454,6 @@ class ClosureCompilerPlugin {
                 assetName = assetName.substr(0, assetName.length - 3);
               }
               const sourceMap = JSON.parse(outputFile.sourceMap);
-
               sourceMap.file = assetName;
               const source = outputFile.src;
               compilation.assets[assetName] = new SourceMapSource(

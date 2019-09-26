@@ -35,7 +35,7 @@ module.exports = {
       new ClosurePlugin({mode: 'STANDARD'}, {
         // compiler flags here
         //
-        // for debuging help, try these:
+        // for debugging help, try these:
         //
         // formatting: 'PRETTY_PRINT'
         // debug: true,

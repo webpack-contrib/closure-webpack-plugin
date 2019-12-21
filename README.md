@@ -66,6 +66,9 @@ module.exports = {
  * **output** - An object with either `filename` or `chunkfilename` properties. Used to override the
   output file naming for a particular compilation. See https://webpack.js.org/configuration/output/
   for details.
+ * **test** - An optional string or regular expression to determine whether a chunk is included in the compilation
+ * **extraCommandArgs** - Optional string or Array of strings to pass to the google-closure-compiler plugin.
+   Can be used to pass flags to the java process.
   
 ## Compiler Flags
 

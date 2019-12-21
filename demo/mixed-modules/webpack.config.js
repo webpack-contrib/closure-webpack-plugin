@@ -10,7 +10,8 @@ module.exports = (env, argv) => {
     },
     output: {
       path: path.resolve(__dirname, 'public'),
-      filename: '[name].js',
+      filename: isProduction ? '[name].[chunkhash:8].js' : '[name].js?[chunkhash:8]',
+      chunkFilename: isProduction ? '[name].[chunkhash:8].js' : '[name].js?[chunkhash:8]',
     },
     devServer: {
       open: true,

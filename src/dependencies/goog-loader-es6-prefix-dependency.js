@@ -24,6 +24,10 @@ class GoogLoaderEs6PrefixDependency extends Dependency {
   get type() {
     return 'goog loader es6 prefix';
   }
+
+  updateHash(hash) {
+    hash.update(this.insertPosition + '');
+  }
 }
 
 class GoogLoaderEs6PrefixDependencyTemplate {

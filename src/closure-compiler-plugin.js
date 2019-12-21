@@ -16,7 +16,7 @@ const HarmonyExportDependency = require('./dependencies/harmony-export-dependenc
 const HarmonyImportDependency = require('./dependencies/harmony-import-dependency');
 const HarmonyMarkerDependency = require('./dependencies/harmony-marker-dependency');
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
-const AMDDefineDependencyTemplate = require('./dependencies/amd-define-dependency-template');
+const AMDDefineDependency = require('./dependencies/amd-define-dependency');
 const validateOptions = require('schema-utils');
 const closureCompilerPluginSchema = require('../schema/closure-compiler.json');
 const toSafePath = require('./safe-path');
@@ -188,6 +188,58 @@ class ClosureCompilerPlugin {
         );
       }
 
+      const dependencyFactoriesByName = new Map();
+      compilation.dependencyFactories.forEach((val, key) => {
+        dependencyFactoriesByName.set(key.name, val);
+      });
+      const dependencyTemplatesByName = new Map();
+      compilation.dependencyTemplates.forEach((val, key) => {
+        dependencyTemplatesByName.set(key.name, val);
+      });
+      [
+        'AMDDefineDependency',
+        'HarmonyImportSideEffectDependency',
+        'HarmonyImportSpecifierDependency',
+        'HarmonyExportHeaderDependency',
+        'HarmonyExportExpressionDependency',
+        'HarmonyExportImportedSpecifierDependency',
+        'HarmonyExportSpecifierDependency',
+      ].forEach((factoryName) =>
+        compilation.dependencyFactories.delete(
+          dependencyFactoriesByName.get(factoryName)
+        )
+      );
+
+      [
+        'AMDDefineDependencyTemplate',
+        'HarmonyImportSideEffectDependencyTemplate',
+        'HarmonyImportSpecifierDependencyTemplate',
+        'HarmonyExportHeaderDependencyTemplate',
+        'HarmonyExportExpressionDependencyTemplate',
+        'HarmonyExportImportedSpecifierDependencyTemplate',
+        'HarmonyExportSpecifierDependencyTemplate',
+      ].forEach((templateName) =>
+        compilation.dependencyTemplates.delete(
+          dependencyTemplatesByName.get(templateName)
+        )
+      );
+
+      compilation.dependencyFactories.set(
+        HarmonyExportDependency,
+        normalModuleFactory
+      );
+      compilation.dependencyTemplates.set(
+        HarmonyExportDependency,
+        new HarmonyExportDependency.Template()
+      );
+      compilation.dependencyFactories.set(
+        HarmonyExportDependency,
+        normalModuleFactory
+      );
+      compilation.dependencyTemplates.set(
+        HarmonyExportDependency,
+        new HarmonyExportDependency.Template()
+      );
       compilation.dependencyFactories.set(
         HarmonyExportDependency,
         normalModuleFactory
@@ -221,7 +273,7 @@ class ClosureCompilerPlugin {
             case 'AMDDefineDependency':
               compilation.dependencyTemplates.set(
                 key,
-                new AMDDefineDependencyTemplate()
+                new AMDDefineDependency.Template()
               );
               break;
 
@@ -253,6 +305,15 @@ class ClosureCompilerPlugin {
         }
       );
     }
+
+    compilation.mainTemplate.hooks.hash.tap(
+      'SetVarMainTemplatePlugin',
+      (hash) => {
+        hash.update('set var');
+        hash.update(`${this.varExpression}`);
+        hash.update(`${this.copyObject}`);
+      }
+    );
 
     compilation.hooks.buildModule.tap(PLUGIN, (moduleArg) => {
       // to get detailed location info about errors

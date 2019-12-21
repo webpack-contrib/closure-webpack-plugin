@@ -1,6 +1,14 @@
 const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependency');
 
-class AMDDefineDependencyTemplate extends AMDDefineDependency.Template {
+class ClosureAMDDefineDependency extends AMDDefineDependency {
+  updateHash(hash) {
+    hash.update(this.rangeStatement + '');
+    hash.update(this.declaration + '');
+    hash.update('ClosureAMDDefineDependency');
+  }
+}
+
+ClosureAMDDefineDependency.Template = class ClosureAMDDefineDependencyTemplate extends AMDDefineDependency.Template {
   get definitions() {
     const defs = super.definitions;
     for (const value in defs) {
@@ -19,6 +27,6 @@ class AMDDefineDependencyTemplate extends AMDDefineDependency.Template {
     }
     return defs;
   }
-}
+};
 
-module.exports = AMDDefineDependencyTemplate;
+module.exports = ClosureAMDDefineDependency;

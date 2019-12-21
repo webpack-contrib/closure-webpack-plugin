@@ -10,6 +10,11 @@ class GoogDependency extends ModuleDependency {
   get type() {
     return 'goog.require or goog.module.get';
   }
+
+  updateHash(hash) {
+    hash.update(this.insertPosition + '');
+    hash.update(this.isBase + '');
+  }
 }
 
 class GoogDependencyTemplate {

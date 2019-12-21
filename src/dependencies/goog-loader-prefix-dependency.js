@@ -10,6 +10,11 @@ class GoogLoaderPrefixDependency extends ModuleDependency {
   get type() {
     return 'goog loader prefix';
   }
+
+  updateHash(hash) {
+    hash.update(this.insertPosition + '');
+    hash.update(this.isGoogModule + '');
+  }
 }
 
 class GoogLoaderPrefixDependencyTemplate {

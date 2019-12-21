@@ -43,8 +43,11 @@ module.exports = (env, argv) => {
     },
     plugins: [
       new CopyWebpackPlugin([{
-        from: path.resolve(__dirname, './node_modules/@webcomponents/webcomponentsjs/**/*.js'),
-        to: path.resolve(__dirname, 'public', 'js', 'webcomponentsjs')
+        from: path.resolve(__dirname, './node_modules/@webcomponents/webcomponentsjs/webcomponents-loader.js'),
+        to: path.resolve(__dirname, 'public', 'js', 'webcomponentsjs/webcomponents-loader.js')
+      }, {
+        from: path.resolve(__dirname, './node_modules/@webcomponents/webcomponentsjs/bundles'),
+        to: path.resolve(__dirname, 'public', 'js', 'webcomponentsjs', 'bundles')
       }])
     ]
   };

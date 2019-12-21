@@ -723,8 +723,8 @@ class ClosureCompilerPlugin {
         // Remove any assets created by the synthetic base chunk
         // They are concatenated on to each entry point.
         if (baseChunk) {
-          baseChunk.files.forEach((baseFile) => {
-            delete compilation.assets[baseFile];
+          baseChunk.files.forEach((filename) => {
+            delete compilation.assets[filename];
           });
           baseChunk.files.splice(0, baseChunk.files.length);
         }
@@ -805,9 +805,7 @@ class ClosureCompilerPlugin {
             }
             allSources.push(srcInfo);
           });
-          let chunkDefinitionString = `${chunkDefArray[i].name}:${
-            chunkDefArray[i].sources.length
-          }`;
+          let chunkDefinitionString = `${chunkDefArray[i].name}:${chunkDefArray[i].sources.length}`;
           if (chunkDefArray[i].parentNames.size > 0) {
             chunkDefinitionString += `:${Array.from(
               chunkDefArray[i].parentNames
@@ -1286,9 +1284,7 @@ class ClosureCompilerPlugin {
             error.originalLocation.source !== error.source ||
             error.originalLocation.line !== error.line
           ) {
-            formattedMsg += ` (originally at ${originalSource}${
-              error.originalLocation.line
-            })`;
+            formattedMsg += ` (originally at ${originalSource}${error.originalLocation.line})`;
           }
         }
         formattedMsg += ` from closure-compiler: ${error.description}`;

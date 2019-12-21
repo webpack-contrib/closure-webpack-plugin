@@ -12,12 +12,12 @@
   "author": "Chad Killingsworth <chadkillingsworth@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@polymer/polymer": "^3.1.0",
-    "@webcomponents/webcomponentsjs": "^2.2.1",
-    "copy-webpack-plugin": "^4.6.0"
+    "@polymer/polymer": "3.x",
+    "@webcomponents/webcomponentsjs": "2.x",
+    "copy-webpack-plugin": "5.x"
   },
   "devDependencies": {
-    "npm-run-all": "^4.1.2",
+    "npm-run-all": "4.x",
     "webpack": "4.x",
     "webpack-cli": "3.x",
     "webpack-dev-server": "3.x"

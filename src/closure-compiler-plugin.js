@@ -453,7 +453,7 @@ class ClosureCompilerPlugin {
               if (chunkIdParts && !/\.js$/.test(chunk.files[0])) {
                 assetName = assetName.substr(0, assetName.length - 3);
               }
-              const sourceMap = JSON.parse(outputFile.source_map);
+              const sourceMap = JSON.parse(outputFile.sourceMap);
               sourceMap.file = assetName;
               const source = outputFile.src;
               compilation.assets[assetName] = new SourceMapSource(

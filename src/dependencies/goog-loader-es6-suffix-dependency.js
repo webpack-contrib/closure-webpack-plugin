@@ -12,6 +12,10 @@ class GoogLoaderEs6SuffixDependency extends Dependency {
   get type() {
     return 'goog loader es6 suffix';
   }
+
+  updateHash(hash) {
+    hash.update(this.insertPosition + '');
+  }
 }
 
 class GoogLoaderes6SuffixDependencyTemplate {

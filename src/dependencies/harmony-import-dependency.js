@@ -1,6 +1,10 @@
 const HarmonyImportSpecifierDependency = require('webpack/lib/dependencies/HarmonyImportSpecifierDependency');
 
-class ClosureHarmonyImportDependency extends HarmonyImportSpecifierDependency {}
+class ClosureHarmonyImportDependency extends HarmonyImportSpecifierDependency {
+  updateHash(hash) {
+    hash.update('ClosureHarmonyImportDependency');
+  }
+}
 
 ClosureHarmonyImportDependency.Template = class ClosureHarmonyImportDependencyTemplate {
   apply(dep, source, runtime) {

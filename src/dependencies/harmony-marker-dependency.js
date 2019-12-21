@@ -12,6 +12,10 @@ class ClosureHarmonyMarkerDependency extends NullDependency {
     super();
     this.range = range;
   }
+
+  updateHash(hash) {
+    hash.update(this.range + '');
+  }
 }
 
 ClosureHarmonyMarkerDependency.Template = HarmonyNoopTemplate;

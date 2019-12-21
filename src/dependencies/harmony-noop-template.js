@@ -6,6 +6,10 @@ class HarmonyNoopTemplate {
   getHarmonyInitOrder(dep) {
     return dep.sourceOrder;
   }
+
+  updateHash(hash) {
+    hash.update('HarmonyNoopTemplate');
+  }
 }
 
 module.exports = HarmonyNoopTemplate;

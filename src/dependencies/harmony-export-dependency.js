@@ -20,6 +20,12 @@ class ClosureHarmonyExportDependency extends NullDependency {
       dependencies: undefined, // eslint-disable-line no-undefined
     };
   }
+
+  updateHash(hash) {
+    hash.update(this.rangeStatement + '');
+    hash.update(this.declaration + '');
+    hash.update('ClosureHarmonyExportDependency');
+  }
 }
 
 ClosureHarmonyExportDependency.Template = class ClosureHarmonyExportDependencyTemplate {

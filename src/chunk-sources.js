@@ -38,7 +38,7 @@ module.exports = function getChunkSources(chunk, compilation) {
       sourceMap,
       webpackId:
         webpackModule.id !== null &&
-        webpackModule.id !== undefined &&
+        webpackModule.id !== undefined && // eslint-disable-line no-undefined
         webpackModule.id.toString().length > 0
           ? `${webpackModule.id}`
           : null,

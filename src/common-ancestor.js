@@ -74,7 +74,7 @@ function findNearestCommonParentChunk(chunkGroups, currentDistance = 0) {
   }
 
   const nearestCommonParent = {
-    chunkGroup: undefined,
+    chunkGroup: undefined, // eslint-disable-line no-undefined
     distance: -1,
   };
   distances.forEach((distance, chunkGroup) => {

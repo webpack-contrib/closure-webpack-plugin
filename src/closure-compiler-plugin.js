@@ -634,7 +634,7 @@ class ClosureCompilerPlugin {
 
       // Entrypoints are chunk groups with no parents
       if (primaryChunk && primaryChunk.entryModule) {
-        if (!baseChunk) {
+        if (!baseChunk || chunkGroup.getParents().length === 0) {
           primaryParentNames.push(this.BASE_CHUNK_NAME);
         }
         const entryModuleDeps =
@@ -1101,68 +1101,74 @@ class ClosureCompilerPlugin {
    * all chunk sources to the compilation.
    *
    * @param {?} compilation
-   * @param {!Chunk} chunk
-   * @param {!Array<string>} parentChunkNames - logical chunk parent of this tree
+   * @param {!Chunk} initialChunk
+   * @param {!Array<string>} initialParentChunkNames - logical chunk parent of this tree
    * @param {!ChunkMap} chunkDefs
    * @param {!Array<string>} entrypoints modules
    */
   addChunkToCompilationStandard(
     compilation,
-    chunk,
-    parentChunkNames,
+    initialChunk,
+    initialParentChunkNames,
     chunkDefs,
     entrypoints
   ) {
-    const chunkName = this.getChunkName(compilation, chunk);
-    const safeChunkName = chunkName.replace(/\.js$/, '');
-    const chunkSources = [];
-    chunk.files.forEach((chunkFile) => {
-      if (!chunkFile.match(this.options.test)) {
-        return;
-      }
-      let src = '';
-      let sourceMap = null;
-      try {
-        const souceAndMap = compilation.assets[chunkFile].sourceAndMap();
-        src = souceAndMap.source;
-        if (souceAndMap.map) {
-          sourceMap = souceAndMap.map;
+    const chunkQueue = [
+      {
+        chunk: initialChunk,
+        parentChunkNames: initialParentChunkNames,
+      },
+    ];
+    while (chunkQueue.length > 0) {
+      const { chunk, parentChunkNames } = chunkQueue.pop();
+      const chunkName = this.getChunkName(compilation, chunk);
+      const safeChunkName = chunkName.replace(/\.js$/, '');
+      const chunkSources = [];
+      chunk.files.forEach((chunkFile) => {
+        if (!chunkFile.match(this.options.test)) {
+          return;
         }
-      } catch (e) {
-        compilation.errors.push(e);
+        let src = '';
+        let sourceMap = null;
+        try {
+          const souceAndMap = compilation.assets[chunkFile].sourceAndMap();
+          src = souceAndMap.source;
+          if (souceAndMap.map) {
+            sourceMap = souceAndMap.map;
+          }
+        } catch (e) {
+          compilation.errors.push(e);
+        }
+        chunkSources.push({
+          path: chunkName,
+          src,
+          sourceMap,
+        });
+      });
+
+      const chunkDef = {
+        name: safeChunkName,
+        parentNames: new Set(),
+        sources: chunkSources,
+        outputWrapper: '(function(){%s}).call(this || window)',
+      };
+      if (parentChunkNames) {
+        parentChunkNames.forEach((parentName) => {
+          chunkDef.parentNames.add(parentName);
+        });
       }
-      chunkSources.push({
-        path: chunkName,
-        src,
-        sourceMap,
-      });
-    });
-
-    const chunkDef = {
-      name: safeChunkName,
-      parentNames: new Set(),
-      sources: chunkSources,
-      outputWrapper: '(function(){%s}).call(this || window)',
-    };
-    if (parentChunkNames) {
-      parentChunkNames.forEach((parentName) => {
-        chunkDef.parentNames.add(parentName);
-      });
-    }
-    chunkDefs.set(safeChunkName, chunkDef);
-
-    const forEachChildChunk = (childChunk) => {
-      this.addChunkToCompilationStandard(
-        compilation,
-        childChunk,
-        [safeChunkName],
-        chunkDefs,
-        entrypoints
-      );
-    };
-    for (const group of chunk.groupsIterable) {
-      for (const childGroup of group.childrenIterable) {
-        childGroup.chunks.forEach(forEachChildChunk);
+      chunkDefs.set(safeChunkName, chunkDef);
+      for (const group of chunk.groupsIterable) {
+        for (const childGroup of group.childrenIterable) {
+          const chunksToAdd = [];
+          childGroup.chunks.forEach((childChunk) => {
+            chunksToAdd.unshift({
+              chunk: childChunk,
+              parentNames: [safeChunkName],
+            });
+          });
+          chunkQueue.push(...chunksToAdd);
+        }
       }
     }
   }

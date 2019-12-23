@@ -1,27 +1,35 @@
 /**
  * Find an ancestor of a chunk. Return the distance from the target or -1 if not found.
  *
- * @param {string} src
- * @param {string} target
- * @param {number} currentDistance
+ * @param {ChunkGroup} initialSrc
+ * @param {ChunkGroup} target
+ * @param {number} initialDistance
  * @return {number} distance from target of parent or -1 when not found
  */
-function findAncestorDistance(src, target, currentDistance) {
-  if (target === src) {
-    return currentDistance;
-  }
-
+function findAncestorDistance(initialSrc, target, initialDistance) {
   const distances = [];
-  src.getParents().forEach((srcParentChunkGroup) => {
-    const distance = findAncestorDistance(
-      srcParentChunkGroup,
-      target,
-      currentDistance + 1
-    );
-    if (distance >= 0) {
-      distances.push(distance);
+  const parentChunkQueue = [
+    {
+      src: initialSrc,
+      currentDistance: initialDistance,
+    },
+  ];
+  while (parentChunkQueue.length > 0) {
+    const { src, currentDistance } = parentChunkQueue.pop();
+    if (target === src) {
+      if (currentDistance >= 0) {
+        distances.push(currentDistance);
+      }
+    } else {
+      const parentChunkGroups = src.getParents();
+      for (let i = parentChunkGroups.length - 1; i >= 0; i--) {
+        parentChunkQueue.push({
+          src: parentChunkGroups[i],
+          currentDistance: currentDistance + 1,
+        });
+      }
     }
-  });
+  }
   if (distances.length === 0) {
     return -1;
   }

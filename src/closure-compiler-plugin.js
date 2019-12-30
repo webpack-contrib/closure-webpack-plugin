@@ -1093,6 +1093,7 @@ class ClosureCompilerPlugin {
       noChunkHash: !useChunkHash,
       chunk,
       hash: useChunkHash ? chunk.hash : compilation.hash,
+      contentHash: chunk.contentHash.javascript,
     });
   }
 

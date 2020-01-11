@@ -155,11 +155,11 @@ class ClosureCompilerPlugin {
       );
     }
     compiler.hooks.compilation.tap(PLUGIN, (compilation, params) =>
-      this.complation_(compilation, params)
+      this.compilation_(compilation, params)
     );
   }
 
-  complation_(compilation, { normalModuleFactory }) {
+  compilation_(compilation, { normalModuleFactory }) {
     const runFullCompilation =
       !compilation.compiler.parentCompilation ||
       this.options.childCompilations(compilation);
@@ -1132,10 +1132,10 @@ class ClosureCompilerPlugin {
         let src = '';
         let sourceMap = null;
         try {
-          const souceAndMap = compilation.assets[chunkFile].sourceAndMap();
-          src = souceAndMap.source;
-          if (souceAndMap.map) {
-            sourceMap = souceAndMap.map;
+          const sourceAndMap = compilation.assets[chunkFile].sourceAndMap();
+          src = sourceAndMap.source;
+          if (sourceAndMap.map) {
+            sourceMap = sourceAndMap.map;
           }
         } catch (e) {
           compilation.errors.push(e);

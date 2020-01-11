@@ -1165,7 +1165,7 @@ class ClosureCompilerPlugin {
           childGroup.chunks.forEach((childChunk) => {
             chunksToAdd.unshift({
               chunk: childChunk,
-              parentNames: [safeChunkName],
+              parentChunkNames: [safeChunkName],
             });
           });
           chunkQueue.push(...chunksToAdd);

@@ -1390,7 +1390,7 @@ ClosureCompilerPlugin.DEFAULT_FLAGS_AGGRESSIVE_BUNDLE = {
   module_resolution: 'WEBPACK',
   rename_prefix_namespace: '__wpcc',
   process_common_js_modules: true,
-  dependency_mode: 'STRICT',
+  dependency_mode: 'PRUNE',
   assume_function_wrapper: true,
   source_map_include_content: true,
 };

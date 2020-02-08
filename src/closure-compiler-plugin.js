@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 const googleClosureCompiler = require('google-closure-compiler');
 const {
   getFirstSupportedPlatform,
@@ -1044,9 +1045,7 @@ class ClosureCompilerPlugin {
         resolve(outputFiles);
       });
 
-      process.nextTick(() => {
-        compilerProcess.stdin.end(JSON.stringify(sources));
-      });
+      Readable.from(JSON.stringify(sources)).pipe(compilerProcess.stdin);
     });
   }
 

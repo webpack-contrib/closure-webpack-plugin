@@ -14,7 +14,8 @@
   "dependencies": {
     "@polymer/polymer": "3.x",
     "@webcomponents/webcomponentsjs": "2.x",
-    "copy-webpack-plugin": "5.x"
+    "copy-webpack-plugin": "5.x",
+    "google-closure-library": "^20200101.0.0"
   },
   "devDependencies": {
     "npm-run-all": "4.x",

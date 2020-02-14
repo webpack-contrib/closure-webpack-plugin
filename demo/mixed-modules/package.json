@@ -15,7 +15,7 @@
   "author": "koba04",
   "license": "MIT",
   "dependencies": {
-    "google-closure-library": "^20191111.0.0"
+    "google-closure-library": "^20200101.0.0"
   },
   "devDependencies": {
     "mocha": "^6.2.2",

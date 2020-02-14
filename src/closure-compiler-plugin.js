@@ -1045,7 +1045,12 @@ class ClosureCompilerPlugin {
         resolve(outputFiles);
       });
 
-      Readable.from(JSON.stringify(sources)).pipe(compilerProcess.stdin);
+      const buffer = new Buffer(JSON.stringify(sources), 'utf8');
+      const readable = new Readable();
+      readable._read = () => {};
+      readable.push(buffer);
+      readable.push(null);
+      readable.pipe(compilerProcess.stdin);
     });
   }
 

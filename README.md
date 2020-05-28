@@ -135,7 +135,7 @@ module.exports = {
       ),
       deps: [
         require.resolve('google-closure-library/closure/goog/deps'),
-        './public/deps.js',
+        './public/deps.js'
       ],
     })
   ]

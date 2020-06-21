@@ -1144,6 +1144,22 @@ class ClosureCompilerPlugin {
         } catch (e) {
           compilation.errors.push(e);
         }
+        if (sourceMap && Array.isArray(sourceMap.sources)) {
+          // Closure doesn't support all characters in the loader?ref!filepath "path" format Webpack uses, so trim off the loader prefix.
+          sourceMap.sources = sourceMap.sources.map((sourcePath) => {
+            const loaderPrefixEndIndex = sourcePath.lastIndexOf('!');
+            let sanitizedPath =
+              loaderPrefixEndIndex !== -1
+                ? sourcePath.slice(loaderPrefixEndIndex + 1)
+                : sourcePath;
+            if (sanitizedPath.length === 0) {
+              // If a loader created the file (e.g. inject-loader) the original path is empty. Just sanitize the generated name to create a unique name.
+              sanitizedPath = toSafePath(sourcePath);
+            }
+            // Standardize to forward slash in paths as Closure sometimes fails to resolve with back slash.
+            return sanitizedPath.replace(/\\/g, '/');
+          });
+        }
         chunkSources.push({
           path: chunkName,
           src,

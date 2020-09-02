@@ -1003,6 +1003,14 @@ class ClosureCompilerPlugin {
           return;
         }
 
+        if (platform.toLowerCase() === 'java') {
+          // Ignore Java warnings written to stderr
+          stdErrData = stdErrData
+            .split('\n')
+            .filter((e) => !e.startsWith('WARNING: '))
+            .join('\n');
+        }
+
         if (stdErrData.length > 0) {
           let errors = [];
           try {

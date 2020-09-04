@@ -108,7 +108,8 @@ class GoogRequireParserPlugin {
           );
           return false;
         }
-        this.addGoogDependency(parser, modulePath);
+        const isRequireType = expr.callee.property.name === 'requireType';
+        this.addGoogDependency(parser, modulePath, false, isRequireType);
       } catch (e) {
         parser.state.compilation.errors.push(e);
       }
@@ -116,6 +117,9 @@ class GoogRequireParserPlugin {
     };
     parser.hooks.call
       .for('goog.require')
+      .tap(PLUGIN, googRequireProvideCallback);
+    parser.hooks.call
+      .for('goog.requireType')
       .tap(PLUGIN, googRequireProvideCallback);
     parser.hooks.call
       .for('goog.provide')
@@ -208,12 +212,12 @@ class GoogRequireParserPlugin {
     }
   }
 
-  addGoogDependency(parser, request, addAsBaseJs) {
+  addGoogDependency(parser, request, addAsBaseJs, isRequireType) {
     // ES6 prefixing must happen after all requires have loaded otherwise
     // Closure library can think an ES6 module is calling goog.provide/module.
     const baseInsertPos = !isProductionLikeMode(this.options) ? -1 : null;
     parser.state.current.addDependency(
-      new GoogDependency(request, baseInsertPos, addAsBaseJs)
+      new GoogDependency(request, baseInsertPos, addAsBaseJs, isRequireType)
     );
   }
 

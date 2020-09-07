@@ -865,7 +865,10 @@ class ClosureCompilerPlugin {
           chunkNamesProcessed.add(chunkDefArray[i].name);
           chunkDefArray[i].sources.forEach((srcInfo) => {
             if (srcInfo.sourceMap) {
-              srcInfo.sourceMap = JSON.stringify(srcInfo.sourceMap);
+              srcInfo.sourceMap = JSON.stringify({
+                ...srcInfo.sourceMap,
+                sources: srcInfo.sourceMap.sources.map(toSafePath)
+              });
             }
             allSources.push(srcInfo);
           });

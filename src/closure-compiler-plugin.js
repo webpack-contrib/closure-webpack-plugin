@@ -1045,6 +1045,9 @@ class ClosureCompilerPlugin {
         resolve(outputFiles);
       });
 
+      // Ignore errors (EPIPE) if the compiler input stream is closed
+      compilerProcess.stdin.on('error', (err) => {});
+
       const buffer = new Buffer(JSON.stringify(sources), 'utf8');
       const readable = new Readable();
       readable._read = () => {};

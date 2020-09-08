@@ -109,7 +109,6 @@ jobs:
           name: Publish to NPM
           command: printf "noop running conventional-github-releaser"
 
-version: 2.0
 workflows:
   version: 2
   validate-publish:

@@ -1124,6 +1124,7 @@ class ClosureCompilerPlugin {
         parentChunkNames: initialParentChunkNames,
       },
     ];
+    const chunksEverInQueue = new Set([initialChunk.id]);
     while (chunkQueue.length > 0) {
       const { chunk, parentChunkNames } = chunkQueue.pop();
       const chunkName = this.getChunkName(compilation, chunk);
@@ -1167,10 +1168,13 @@ class ClosureCompilerPlugin {
         for (const childGroup of group.childrenIterable) {
           const chunksToAdd = [];
           childGroup.chunks.forEach((childChunk) => {
-            chunksToAdd.unshift({
-              chunk: childChunk,
-              parentChunkNames: [safeChunkName],
-            });
+            if (!chunksEverInQueue.has(childChunk.id)) {
+              chunksEverInQueue.add(childChunk.id);
+              chunksToAdd.unshift({
+                chunk: childChunk,
+                parentChunkNames: [safeChunkName],
+              });
+            }
           });
           chunkQueue.push(...chunksToAdd);
         }

@@ -14,6 +14,7 @@ function findAncestorDistance(initialSrc, target, initialDistance) {
       currentDistance: initialDistance,
     },
   ];
+  const visitedChunks = new Set([initialSrc]);
   while (parentChunkQueue.length > 0) {
     const { src, currentDistance } = parentChunkQueue.pop();
     if (target === src) {
@@ -23,10 +24,13 @@ function findAncestorDistance(initialSrc, target, initialDistance) {
     } else {
       const parentChunkGroups = src.getParents();
       for (let i = parentChunkGroups.length - 1; i >= 0; i--) {
-        parentChunkQueue.push({
-          src: parentChunkGroups[i],
-          currentDistance: currentDistance + 1,
-        });
+        if (!visitedChunks.has(parentChunkGroups[i])) {
+          visitedChunks.add(parentChunkGroups[i]);
+          parentChunkQueue.push({
+            src: parentChunkGroups[i],
+            currentDistance: currentDistance + 1,
+          });
+        }
       }
     }
   }

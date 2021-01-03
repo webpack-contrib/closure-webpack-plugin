@@ -15,12 +15,12 @@
   "author": "koba04",
   "license": "MIT",
   "dependencies": {
-    "google-closure-library": "^20200101.0.0"
+    "google-closure-library": "^20201102.0.1"
   },
   "devDependencies": {
     "mocha": "^6.2.2",
     "npm-run-all": "4.x",
-    "webpack": "4.x",
+    "webpack": "^4.37.0",
     "webpack-cli": "3.x",
     "webpack-dev-server": "3.x"
   }

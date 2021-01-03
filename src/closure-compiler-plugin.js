@@ -867,7 +867,7 @@ class ClosureCompilerPlugin {
             if (srcInfo.sourceMap) {
               srcInfo.sourceMap = JSON.stringify({
                 ...srcInfo.sourceMap,
-                sources: srcInfo.sourceMap.sources.map(toSafePath)
+                sources: srcInfo.sourceMap.sources.map(toSafePath),
               });
             }
             allSources.push(srcInfo);

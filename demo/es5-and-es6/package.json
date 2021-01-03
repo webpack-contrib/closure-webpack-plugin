@@ -14,12 +14,12 @@
   "dependencies": {
     "@polymer/polymer": "3.x",
     "@webcomponents/webcomponentsjs": "2.x",
-    "copy-webpack-plugin": "5.x",
+    "copy-webpack-plugin": "6.x",
     "google-closure-library": "^20200204.0.0"
   },
   "devDependencies": {
     "npm-run-all": "4.x",
-    "webpack": "4.x",
+    "webpack": "^4.37.0",
     "webpack-cli": "3.x",
     "webpack-dev-server": "3.x"
   }

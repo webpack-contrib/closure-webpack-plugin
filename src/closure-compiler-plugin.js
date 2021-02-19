@@ -465,9 +465,6 @@ class ClosureCompilerPlugin {
     // each chunk and find any entry points.
     // Add the entry point and any descendant chunks to the compilation.
     originalChunks.forEach((chunk) => {
-      if (!chunk.hasEntryModule()) {
-        return;
-      }
       const chunkDefs = new Map();
       const entrypoints = [];
       this.addChunkToCompilationStandard(

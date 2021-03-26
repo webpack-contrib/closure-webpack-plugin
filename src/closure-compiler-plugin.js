@@ -970,9 +970,9 @@ class ClosureCompilerPlugin {
         if (stdErrData instanceof Error) {
           this.reportErrors(compilation, [
             {
-            level: 'error',
-            description: stdErrData.message,
-            }
+              level: 'error',
+              description: stdErrData.message,
+            },
           ]);
           reject();
           return;
@@ -1014,7 +1014,7 @@ class ClosureCompilerPlugin {
             {
               level: 'error',
               description: `Closure compiler exited with code ${exitCode}.`,
-            }
+            },
           ]);
         }
 

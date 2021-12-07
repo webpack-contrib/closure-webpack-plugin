@@ -25,6 +25,10 @@
     },
     "mode": {
       "$ref": "#/definitions/modes"
+    },
+    "exportGlobalGoog": {
+      "description": "Always export the goog global variable if true",
+      "type": "boolean"
     }
   }
 }

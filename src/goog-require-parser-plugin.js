@@ -11,8 +11,10 @@ const GoogLoaderEs6SuffixDependency = require('./dependencies/goog-loader-es6-su
 
 const PLUGIN = { name: 'ClosureLibraryPlugin' };
 
-const isProductionLikeMode = (options) =>
-  options.mode === 'production' || !options.mode;
+const isExportGlobalGoog = (options) =>
+  ((options.mode === 'production' || !options.mode) &&
+    options.exportGlobalGoog !== false) ||
+  options.exportGlobalGoog;
 
 class GoogRequireParserPlugin {
   constructor(options) {
@@ -89,7 +91,7 @@ class GoogRequireParserPlugin {
       // For goog.provide calls, add loader code and exit
       if (expr.callee.property.name === 'provide') {
         if (
-          !isProductionLikeMode(this.options) &&
+          isExportGlobalGoog(this.options) &&
           !parser.state.current.dependencies.find(
             (dep) => dep instanceof GoogLoaderPrefixDependency
           )
@@ -127,11 +129,7 @@ class GoogRequireParserPlugin {
 
     // When closure-compiler is not bundling the output or if specifically requested,
     // shim base.js of closure-library
-    if (
-      (!isProductionLikeMode(this.options) &&
-        this.options.exportGlobalGoog !== false) ||
-      this.options.exportGlobalGoog
-    ) {
+    if (isExportGlobalGoog(this.options)) {
       parser.hooks.statement.tap(PLUGIN, (expr) => {
         if (
           expr.type === 'VariableDeclaration' &&
@@ -151,7 +149,7 @@ class GoogRequireParserPlugin {
         }
       });
       parser.hooks.call.for('goog.module').tap(PLUGIN, (expr) => {
-        if (!isProductionLikeMode(this.options)) {
+        if (isExportGlobalGoog(this.options)) {
           if (
             !parser.state.current.hasDependencies(
               (dep) => dep.request === this.basePath
@@ -220,7 +218,7 @@ class GoogRequireParserPlugin {
   addGoogDependency(parser, request, addAsBaseJs, isRequireType) {
     // ES6 prefixing must happen after all requires have loaded otherwise
     // Closure library can think an ES6 module is calling goog.provide/module.
-    const baseInsertPos = !isProductionLikeMode(this.options) ? -1 : null;
+    const baseInsertPos = isExportGlobalGoog(this.options) ? -1 : null;
     parser.state.current.addDependency(
       new GoogDependency(request, baseInsertPos, addAsBaseJs, isRequireType)
     );
@@ -247,8 +245,8 @@ class GoogRequireParserPlugin {
 
     // ES6 prefixing must happen after all requires have loaded otherwise
     // Closure library can think an ES6 module is calling goog.provide/module.
-    const baseInsertPos = !isProductionLikeMode(this.options) ? 0 : null;
-    const sourceLength = !isProductionLikeMode(this.options)
+    const baseInsertPos = isExportGlobalGoog(this.options) ? 0 : null;
+    const sourceLength = isExportGlobalGoog(this.options)
       ? parser.state.current._source.source().length
       : null;
     parser.state.current.addDependency(

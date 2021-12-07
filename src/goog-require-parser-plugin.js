@@ -127,8 +127,11 @@ class GoogRequireParserPlugin {
 
     // When closure-compiler is not bundling the output or if specifically requested,
     // shim base.js of closure-library
-    if (!isProductionLikeMode(this.options) && this.options.exportGlobalGoog !== false
-         || this.options.exportGlobalGoog) {
+    if (
+      (!isProductionLikeMode(this.options) &&
+        this.options.exportGlobalGoog !== false) ||
+      this.options.exportGlobalGoog
+    ) {
       parser.hooks.statement.tap(PLUGIN, (expr) => {
         if (
           expr.type === 'VariableDeclaration' &&

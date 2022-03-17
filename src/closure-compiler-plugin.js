@@ -52,10 +52,7 @@ function findChunkFile(chunk, chunkId, outputFilePath) {
     const chunkFile = chunk.files[i];
     let normalizedOutputFilePath = outputFilePath.replace(/^\.\//, '');
     if (!/\.js$/.test(chunkFile)) {
-      normalizedOutputFilePath = normalizedOutputFilePath.substr(
-        0,
-        normalizedOutputFilePath.length - 3
-      );
+      normalizedOutputFilePath = normalizedOutputFilePath.slice(0, -3);
     }
 
     if (normalizedOutputFilePath === chunkFile) {
@@ -513,7 +510,7 @@ class ClosureCompilerPlugin {
                 ? chunk.files
                 : [outputFile.path.replace(/^\.\//, '')];
               if (chunkIdParts && !/\.js$/.test(chunk.files[0])) {
-                assetName = assetName.substr(0, assetName.length - 3);
+                assetName = assetName.slice(0, -3);
               }
               const sourceMap = JSON.parse(
                 outputFile.source_map || outputFile.sourceMap
@@ -989,7 +986,7 @@ class ClosureCompilerPlugin {
                 );
                 errors.push({
                   level: 'error',
-                  description: stdErrData.substr(exceptionIndex + 1),
+                  description: stdErrData.slice(exceptionIndex + 1),
                 });
               } catch (e2) {}
             } else {
@@ -1277,7 +1274,7 @@ class ClosureCompilerPlugin {
           const shortChunkHashMap = Object.create(null);
           for (const chunkId of Object.keys(chunkMaps.hash)) {
             if (typeof chunkMaps.hash[chunkId] === 'string') {
-              shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].substr(
+              shortChunkHashMap[chunkId] = chunkMaps.hash[chunkId].slice(
                 0,
                 length
               );
@@ -1301,7 +1298,7 @@ class ClosureCompilerPlugin {
             const contentHash = chunkMaps.contentHash.javascript;
             for (const chunkId of Object.keys(contentHash)) {
               if (typeof contentHash[chunkId] === 'string') {
-                shortContentHashMap[chunkId] = contentHash[chunkId].substr(
+                shortContentHashMap[chunkId] = contentHash[chunkId].slice(
                   0,
                   length
                 );

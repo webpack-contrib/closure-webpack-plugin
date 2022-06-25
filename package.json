@@ -9,6 +9,10 @@
     "src",
     "schema"
   ],
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/webpack"
+  },
   "scripts": {
     "commitlint": "commitlint",
     "commitmsg": "commitlint -e $GIT_PARAMS",

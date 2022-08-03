@@ -12,7 +12,7 @@ ClosureHarmonyImportDependency.Template = class ClosureHarmonyImportDependencyTe
       module: dep._module,
       request: dep._request,
     });
-    source.replace(dep.range[0], dep.range[1], JSON.stringify(moduleId));
+    source.replace(dep.range[0], dep.range[1] - 1, JSON.stringify(moduleId));
   }
 };
 

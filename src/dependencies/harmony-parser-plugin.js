@@ -1,4 +1,5 @@
 const HarmonyExportDependency = require('./harmony-export-dependency');
+const HarmonyExportImportDependency = require('./harmony-export-import-dependency');
 const HarmonyImportDependency = require('./harmony-import-dependency');
 const HarmonyMarkerDependency = require('./harmony-marker-dependency');
 
@@ -23,10 +24,25 @@ class HarmonyParserPlugin {
       }
     );
 
-    parser.hooks.exportImport.tap(PLUGIN_NAME, (statement) => {
+    parser.hooks.exportImport.tap(PLUGIN_NAME, (statement, source) => {
       parser.state.current.addDependency(
         new HarmonyMarkerDependency(statement.range)
       );
+      // This tap seems to fire twice, but we only want to add a single dependency.
+      // Check for an existing dep before adding one.
+      const existingDep = parser.state.current.dependencies.find((dep) =>
+        dep instanceof HarmonyExportImportDependency && dep.range === statement.source.range
+      );
+      if (!existingDep) {
+        const dep = new HarmonyExportImportDependency(
+          source,
+          parser.state.module,
+          parser.state.lastHarmonyImportOrder,
+          parser.state.harmonyParserScope,
+          statement.source.range
+        );
+        parser.state.current.addDependency(dep);
+      }
     });
 
     parser.hooks.import.tap('ClosureCompilerPlugin', (statement, source) => {

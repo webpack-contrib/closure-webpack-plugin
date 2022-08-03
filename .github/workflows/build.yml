@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x]
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm install
+        name: NPM Rebuild
+      - run: npm run ci:coverage
+        name: Run unit tests.
+      - uses: codecov/codecov-action@v3
+        if: ${{ github.event_name == 'pull_request' && matrix.node-version == '18.x' && matrix.os == 'ubuntu-latest' }}
+        with:
+          fail_ci_if_error: true

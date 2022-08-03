@@ -42,10 +42,8 @@ class GoogRequireParserPlugin {
       const ast = acorn.parse(depFileContents, {
         ranges: true,
         locations: false,
-        ecmaVersion: 2017,
-        plugins: {
-          dynamicImport: true,
-        },
+        ecmaVersion: 'latest',
+        sourceType: 'module',
       });
       walk.simple(ast, {
         CallExpression(node) {

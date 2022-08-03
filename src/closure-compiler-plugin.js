@@ -14,6 +14,7 @@ const ModuleTemplate = require('webpack/lib/ModuleTemplate');
 const ClosureRuntimeTemplate = require('./closure-runtime-template');
 const HarmonyParserPlugin = require('./dependencies/harmony-parser-plugin');
 const HarmonyExportDependency = require('./dependencies/harmony-export-dependency');
+const HarmonyExportImportDependency = require('./dependencies/harmony-export-import-dependency');
 const HarmonyImportDependency = require('./dependencies/harmony-import-dependency');
 const HarmonyMarkerDependency = require('./dependencies/harmony-marker-dependency');
 const HarmonyNoopTemplate = require('./dependencies/harmony-noop-template');
@@ -231,20 +232,12 @@ class ClosureCompilerPlugin {
         new HarmonyExportDependency.Template()
       );
       compilation.dependencyFactories.set(
-        HarmonyExportDependency,
+        HarmonyExportImportDependency,
         normalModuleFactory
       );
       compilation.dependencyTemplates.set(
-        HarmonyExportDependency,
-        new HarmonyExportDependency.Template()
-      );
-      compilation.dependencyFactories.set(
-        HarmonyExportDependency,
-        normalModuleFactory
-      );
-      compilation.dependencyTemplates.set(
-        HarmonyExportDependency,
-        new HarmonyExportDependency.Template()
+        HarmonyExportImportDependency,
+        new HarmonyExportImportDependency.Template()
       );
       compilation.dependencyFactories.set(
         HarmonyImportDependency,

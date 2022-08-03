@@ -30,8 +30,7 @@
     "ci:coverage": "npm run test:coverage -- --runInBand"
   },
   "dependencies": {
-    "acorn": "^5.0.0",
-    "acorn-dynamic-import": "^2.0.0",
+    "acorn": "8.x",
     "schema-utils": "1.x",
     "unquoted-property-validator": "^1.0.2",
     "webpack-sources": "1.x"

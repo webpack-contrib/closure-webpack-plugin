@@ -125,10 +125,8 @@ class GoogRequireParserPlugin {
       .for('goog.provide')
       .tap(PLUGIN, googRequireProvideCallback);
 
-    // When closure-compiler is not bundling the output or if specifically requested,
-    // shim base.js of closure-library
-    if (!isProductionLikeMode(this.options) && this.options.exportGlobalGoog !== false
-         || this.options.exportGlobalGoog) {
+    // When closure-compiler is not bundling the output, shim base.js of closure-library
+    if (!isProductionLikeMode(this.options)) {
       parser.hooks.statement.tap(PLUGIN, (expr) => {
         if (
           expr.type === 'VariableDeclaration' &&

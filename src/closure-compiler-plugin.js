@@ -1138,7 +1138,7 @@ class ClosureCompilerPlugin {
         name: safeChunkName,
         parentNames: new Set(),
         sources: chunkSources,
-        outputWrapper: '(function(){%s}).call(this || window)',
+        outputWrapper: '%s',
       };
       if (parentChunkNames) {
         parentChunkNames.forEach((parentName) => {

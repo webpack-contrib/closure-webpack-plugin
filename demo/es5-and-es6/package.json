@@ -19,8 +19,8 @@
   },
   "devDependencies": {
     "npm-run-all": "4.x",
-    "webpack": "^4.37.0",
+    "webpack": "4.x",
     "webpack-cli": "3.x",
-    "webpack-dev-server": "3.x"
+    "webpack-dev-server": "4.x"
   }
 }

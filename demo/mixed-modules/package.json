@@ -18,7 +18,7 @@
     "google-closure-library": "^20201102.0.1"
   },
   "devDependencies": {
-    "mocha": "^6.2.2",
+    "mocha": "^10.2.0",
     "npm-run-all": "4.x",
     "webpack": "4.x",
     "webpack-cli": "3.x",

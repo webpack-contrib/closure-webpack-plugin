@@ -20,8 +20,8 @@
   "devDependencies": {
     "mocha": "^6.2.2",
     "npm-run-all": "4.x",
-    "webpack": "4.x",
-    "webpack-cli": "3.x",
+    "webpack": "5.x",
+    "webpack-cli": "5.x",
     "webpack-dev-server": "4.x"
   }
 }
